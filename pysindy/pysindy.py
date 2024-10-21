@@ -421,6 +421,62 @@ class SINDy(_BaseSINDy):
             return result[0]
         return result
 
+    def get_regressor(self, x, u=None):
+        """
+        XXX
+
+        Parameters
+        ----------
+        x: array-like or list of array-like, shape (n_samples, n_input_features)
+            Samples.
+
+        u: array-like or list of array-like, shape(n_samples, n_control_features), \
+                (default None)
+            Control variables. If ``multiple_trajectories==True`` then u
+            must be a list of control variable data from each trajectory. If the
+            model was fit with control variables then u is not optional.
+
+        Returns
+        -------
+        x_dot: array-like or list of array-like, shape (n_samples, n_input_features)
+            Predicted time derivatives
+        """
+        if not _check_multiple_trajectories(x, None, u):
+            x, _, _, u = _adapt_to_multiple_trajectories(x, None, None, u)
+            multiple_trajectories = False
+        else:
+            multiple_trajectories = True
+
+        x, _, u = _comprehend_and_validate_inputs(x, 1, None, u, self.feature_library)
+
+        check_is_fitted(self, "model")
+        if self.n_control_features_ > 0 and u is None:
+            raise TypeError("Model was fit using control variables, so u is required")
+        if self.n_control_features_ == 0 and u is not None:
+            warnings.warn(
+                "Control variables u were ignored because control variables were"
+                " not used when the model was fit"
+            )
+            u = None
+        if self.discrete_time:
+            x = [validate_input(xi) for xi in x]
+        if u is not None:
+            u = validate_control_variables(x, u)
+            x = [np.concatenate((xi, ui), axis=xi.ax_coord) for xi, ui in zip(x, u)]
+        #result = [self.model.predict([xi]) for xi in x]
+        #result = [
+        #    self.feature_library.reshape_samples_to_spatial_grid(pred)
+        #    for pred in result
+        #]
+        Xt = x
+        for _, name, transform in self.model._iter(with_final=False):
+            Xt = transform.transform(Xt)
+
+        # Kept for backwards compatibility.
+        #if not multiple_trajectories:
+        #    return result[0]
+        return Xt
+    
     def print(self, lhs=None, precision=3, **kwargs):
         """Print the SINDy model equations.
 
@@ -929,4 +985,8 @@ def _comprehend_and_validate_inputs(x, t, x_dot, u, feature_library):
                 ValueError("Could not reshape control input to match the input data.")
             )
         u = [comprehend_and_validate(ui, ti) for ui, ti in _zip_like_sequence(u, t)]
+    return x, x_dot, u
+
+def comprehend_and_validate_inputs(x, t, x_dot, u, feature_library):
+    x, x_dot, u = _comprehend_and_validate_inputs(x, t, x_dot, u, feature_library)
     return x, x_dot, u
