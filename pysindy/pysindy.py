@@ -423,7 +423,7 @@ class SINDy(_BaseSINDy):
 
     def get_regressor(self, x, u=None):
         """
-        XXX
+        Return the regressor matrix evaluated at x and u
 
         Parameters
         ----------
@@ -441,11 +441,11 @@ class SINDy(_BaseSINDy):
         x_dot: array-like or list of array-like, shape (n_samples, n_input_features)
             Predicted time derivatives
         """
-        if not _check_multiple_trajectories(x, None, u):
-            x, _, _, u = _adapt_to_multiple_trajectories(x, None, None, u)
-            multiple_trajectories = False
-        else:
-            multiple_trajectories = True
+        #if not _check_multiple_trajectories(x, None, u):
+        #    x, _, _, u = _adapt_to_multiple_trajectories(x, None, None, u)
+        #    multiple_trajectories = False
+        #else:
+        #    multiple_trajectories = True
 
         x, _, u = _comprehend_and_validate_inputs(x, 1, None, u, self.feature_library)
 

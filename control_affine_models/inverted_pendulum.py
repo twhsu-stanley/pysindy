@@ -25,7 +25,7 @@ integrator_keywords["method"] = "LSODA"
 integrator_keywords["atol"] = 1e-9
 
 # ## SINDy with control (SINDYc)
-# Here we learn a inverted penduum model:
+# Here we learn a inverted penduum model given by:
 # $$ \dot{theta} = theta_dot $$
 # $$ \dot{theta_dot} = g/L * sin(theta) -b/(m*L^2) * theta_dot + 1/(m*L^2) * u $$
 def inverted_pendulum(t, x, u_fun, L = 1, m = 1, b = 0.01):
@@ -33,7 +33,7 @@ def inverted_pendulum(t, x, u_fun, L = 1, m = 1, b = 0.01):
     u = u_fun(t)
     return [
         x[1],
-        g/L * np.sin(x[0]) -b/(m*L^2) * x[1] + 1/(m*L^2) * u,
+        g/L * np.sin(x[0]) -b/(m*L**2) * x[1] + 1/(m*L**2) * u,
     ]
 
 ## Generate Training Data
@@ -42,9 +42,9 @@ t_train = np.arange(0, t_end_train, dt)
 t_train_span = (t_train[0], t_train[-1])
 x_train = []
 u_train = []
-n_traj = 50
+n_traj = 500
 for i in range(n_traj):
-    u_amp_train = np.random.uniform(0, 10)
+    u_amp_train = np.random.uniform(10, 100)
     u_freq_train = np.random.uniform(0, 5)
     u_fun = lambda t: u_amp_train * np.sin(2 * np.pi * u_freq_train * t)
     x0_train = [np.random.uniform(-2, 2), np.random.uniform(-2, 2)]
@@ -65,48 +65,32 @@ for i in range(n_traj):
 #plt.show()
 
 # Instantiate and fit the SINDYc model
-# 1. Concatenate two libraries
-"""
-poly_library = ps.PolynomialLibrary(degree=1)
-fourier_library = ps.FourierLibrary(n_frequencies=1)
-combined_library = poly_library + fourier_library
 
-model = ps.SINDy(
-    optimizer = ps.STLSQ(threshold = 0.05),
-    feature_library = combined_library,
-)
-model.fit(x_train, u=u_train, t=dt)
-model.print()
-print("Feature names:\n", model.get_feature_names())
-"""
-## 2. Generalized Library
-#"""
-# Initialize two libraries
-poly_library_x = ps.PolynomialLibrary(degree = 1)
+# Generalized Library
+poly_library_x = ps.IdentityLibrary() # ps.PolynomialLibrary(degree = 1)
 fourier_library_x = ps.FourierLibrary(n_frequencies = 1)
-poly_library_u = ps.PolynomialLibrary(degree = 1)
+poly_library_u = ps.IdentityLibrary() # assume control affine
 
 # Initialize the generalized library such that it's control affine
 generalized_library = ps.GeneralizedLibrary(
     [poly_library_x, fourier_library_x, poly_library_u],
     tensor_array = [[1,1,0], [1,0,1], [0,1,1]],
-    #exclude_libraries = [0,1],
+    #exclude_libraries = [0,1,2],
     inputs_per_library = [[0,1], [0,1], [2]],
 )
 
 model = ps.SINDy(
-    optimizer = ps.STLSQ(threshold = 0.05),
+    optimizer = ps.STLSQ(threshold = 0.005),
     feature_library = generalized_library,
 )
 model.fit(x_train, u=u_train, t=dt)
 model.print()
 print("Feature names:\n", model.get_feature_names())
-#"""
 
-# TESTING: separate f(x) from g(x)*u ################################
+# TESTING: testing the control affine form ################################
 Xt = np.array([[10.0,2.0]])
-Ut = np.array([[3.0]])
-Theta = model.get_regressor(Xt, u = Ut)
+Ut = np.array([[5.0]])
+Theta = model.get_regressor(Xt, u = np.array([[1.0]]))
 coeff = model.optimizer.coef_
 feature_names = model.get_feature_names()
 idx_x = [] # Indices for f(x)
@@ -118,29 +102,24 @@ for i in range(len(feature_names)):
         idx_x.append(i)
 
 # Get f(x)
-Theta_x = Theta[:,idx_x]
-coeff_x = coeff[:,idx_x]
 f_of_x = Theta[:,idx_x] @ coeff[:,idx_x].T
 
 # Get g(x)
-# Note: this trick exploits the control affine form
-Theta_temp = model.get_regressor(Xt, u = np.array([[1.0]]))
-Theta_u = Theta_temp[:,idx_u]
-g_of_x = Theta_u @ coeff[:,idx_u].T
+g_of_x = Theta[:,idx_u] @ coeff[:,idx_u].T
 
-Err = abs(f_of_x + g_of_x * Ut - Theta @ coeff.T)
+Err = abs(f_of_x + g_of_x * Ut - model.get_regressor(Xt, Ut) @ coeff.T)
 for i in range(len(Err[0])):
     if Err[0][i] > 1e-2:
         print("f_of_x + g_of_x * Ut = ", f_of_x + g_of_x * Ut)
-        print("Theta @ coeff.T = ", Theta @ coeff.T)
+        print("Theta @ coeff.T = ", model.get_regressor(Xt, Ut) @ coeff.T)
         raise ValueError("f_of_x + g_of_x * Ut != Theta @ coeff.T; Check if the model is control affine")
-#####################################################################
+###########################################################################
 
 ## Assess results on a test trajectory
 # Evolve the equations in time using a different initial condition
 t_test = np.arange(0, t_end_test, dt)
 t_test_span = (t_test[0], t_test[-1])
-u_amp_test = np.random.uniform(0, 10)
+u_amp_test = np.random.uniform(10, 100)
 u_freq_test = np.random.uniform(0, 5)
 u_fun = lambda t: u_amp_test * np.sin(2 * np.pi * u_freq_test * t)
 x0_test = [np.random.uniform(-2, 2), np.random.uniform(-2, 2)]
