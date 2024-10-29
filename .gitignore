@@ -43,3 +43,5 @@ docs/_build
 *.sublime*
 
 .hypothesis/
+
+control_affine_models/saved_models/*
