@@ -65,7 +65,6 @@ for i in range(n_traj):
 #plt.show()
 
 # Instantiate and fit the SINDYc model
-
 # Generalized Library
 poly_library_x = ps.IdentityLibrary() # ps.PolynomialLibrary(degree = 1)
 fourier_library_x = ps.FourierLibrary(n_frequencies = 1)
