@@ -441,11 +441,6 @@ class SINDy(_BaseSINDy):
         x_dot: array-like or list of array-like, shape (n_samples, n_input_features)
             Predicted time derivatives
         """
-        #if not _check_multiple_trajectories(x, None, u):
-        #    x, _, _, u = _adapt_to_multiple_trajectories(x, None, None, u)
-        #    multiple_trajectories = False
-        #else:
-        #    multiple_trajectories = True
 
         x, _, u = _comprehend_and_validate_inputs(x, 1, None, u, self.feature_library)
 
@@ -463,18 +458,11 @@ class SINDy(_BaseSINDy):
         if u is not None:
             u = validate_control_variables(x, u)
             x = [np.concatenate((xi, ui), axis=xi.ax_coord) for xi, ui in zip(x, u)]
-        #result = [self.model.predict([xi]) for xi in x]
-        #result = [
-        #    self.feature_library.reshape_samples_to_spatial_grid(pred)
-        #    for pred in result
-        #]
+        
         Xt = x
         for _, name, transform in self.model._iter(with_final=False):
             Xt = transform.transform(Xt)
 
-        # Kept for backwards compatibility.
-        #if not multiple_trajectories:
-        #    return result[0]
         return Xt
     
     def print(self, lhs=None, precision=3, **kwargs):
