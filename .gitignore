@@ -44,5 +44,5 @@ docs/_build
 
 .hypothesis/
 
-control_affine_models/saved_models/*
+control_affine_models/saved_models/**
 *.pkl
