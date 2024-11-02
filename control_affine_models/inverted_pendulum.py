@@ -12,7 +12,9 @@ from sklearn.linear_model import Lasso
 import pickle
 import pysindy as ps
 
-t_end_train = 5
+import math
+
+t_end_data = 5
 t_end_test = 5
 
 # Seed the random number generators for reproducibility
@@ -36,33 +38,53 @@ def inverted_pendulum(t, x, u_fun, L = 1, m = 1, b = 0.01):
         g/L * np.sin(x[0]) -b/(m*L**2) * x[1] + 1/(m*L**2) * u,
     ]
 
-## Generate Training Data
+## Generate the dataset
 dt = 0.002
-t_train = np.arange(0, t_end_train, dt)
-t_train_span = (t_train[0], t_train[-1])
-x_train = []
-u_train = []
-n_traj = 500
+t_data = np.arange(0, t_end_data, dt)
+t_data_span = (t_data[0], t_data[-1])
+x_data = []
+u_data = []
+n_traj = 1000
 for i in range(n_traj):
-    u_amp_train = np.random.uniform(10, 100)
-    u_freq_train = np.random.uniform(0, 5)
-    u_fun = lambda t: u_amp_train * np.sin(2 * np.pi * u_freq_train * t)
-    x0_train = [np.random.uniform(-2, 2), np.random.uniform(-2, 2)]
+    u_amp_data = np.random.uniform(10, 100)
+    u_freq_data = np.random.uniform(0, 5)
+    u_fun = lambda t: u_amp_data * np.sin(2 * np.pi * u_freq_data * t)
+    x0_data = [np.random.uniform(-2, 2), np.random.uniform(-2, 2)]
     x_traj = solve_ivp(
         inverted_pendulum,
-        t_train_span,
-        x0_train,
-        t_eval = t_train,
+        t_data_span,
+        x0_data,
+        t_eval = t_data,
         args = (u_fun,),
         **integrator_keywords,
     ).y.T
-    x_train.append(x_traj)
-    u_train.append(u_fun(t_train))
+    x_data.append(x_traj)
+    u_data.append(u_fun(t_data))
 
-#plt.plot(t_train, x_train[0])
+#plt.plot(t_data, x_data[0])
 #plt.show()
-#plt.plot(t_train, u_train[0])
+#plt.plot(t_data, u_data[0])
 #plt.show()
+
+
+# Split the dataset into training and calibration sets
+# TODO: make this a function
+D1 = 50 #math.floor(n_traj * 0.02) # Size of the training set
+D2 = 600 #n_traj - D1  # Size of the calibration set
+D3 = n_traj - D1 - D2
+
+# Random shuffling
+xu_data = list(zip(x_data, u_data))
+np.random.shuffle(xu_data)
+x_data, u_data = zip(*xu_data)
+
+# Split the data
+x_train = x_data[:D1]
+u_train = u_data[:D1]
+x_cal = x_data[D1:D1+D2]
+u_cal = u_data[D1:D1+D2]
+x_val = x_data[D1+D2:]
+u_val = u_data[D1+D2:]
 
 # Instantiate and fit the SINDYc model
 # Generalized Library
@@ -82,11 +104,12 @@ model = ps.SINDy(
     optimizer = ps.STLSQ(threshold = 0.005),
     feature_library = generalized_library,
 )
-model.fit(x_train, u=u_train, t=dt)
+model.fit(x_train, u = u_train, t = dt)
 model.print()
 print("Feature names:\n", model.get_feature_names())
 
 # TESTING: testing the control affine form ################################
+"""
 Xt = np.array([[10.0,2.0]])
 Ut = np.array([[5.0]])
 Theta = model.get_regressor(Xt, u = np.array([[1.0]]))
@@ -112,6 +135,7 @@ for i in range(len(Err[0])):
         print("f_of_x + g_of_x * Ut = ", f_of_x + g_of_x * Ut)
         print("Theta @ coeff.T = ", model.get_regressor(Xt, Ut) @ coeff.T)
         raise ValueError("f_of_x + g_of_x * Ut != Theta @ coeff.T; Check if the model is control affine")
+"""
 ###########################################################################
 
 ## Assess results on a test trajectory
@@ -152,8 +176,30 @@ for i in range(x_test.shape[1]):
     axs[i].set(xlabel="t", ylabel=r"$\dot x_{}$".format(i))
 fig.show()
 
+# Point-wise Conformal Prediction
+nc_score = []
+for i in range(D2):
+    err = (model.predict(x_cal[i], u = u_cal[i]) - model.differentiate(x_cal[i], t = dt))
+    R = np.linalg.norm(err, 2, axis = 1)
+    nc_score.extend(R)
+
+alpha = 0.05
+n = len(nc_score)
+quantile = np.quantile(nc_score, np.ceil((n + 1) * (1 - alpha)) / n, interpolation="higher")
+
+# Empirical coverage
+emp_scores = []
+for i in range(D3):
+    err = (model.predict(x_val[i], u = u_val[i]) - model.differentiate(x_val[i], t = dt))
+    R = np.linalg.norm(err, 2, axis = 1)
+    emp_scores.extend(R)
+emp_coverage = sum(i < quantile for i in emp_scores) / len(emp_scores)
+print("Empirical Coverage = %5.3f vs. 1-alpha = %5.3f" % (emp_coverage, 1- alpha))
+
 # ### Simulate forward in time (control input function known)
-# When working with control inputs `SINDy.simulate` requires a *function* to be passed in for the control inputs, `u`, because the default integrator used in `SINDy.simulate` uses adaptive time-stepping. We show what to do in the case when you do not know the functional form for the control inputs in the example following this one.
+# When working with control inputs `SINDy.simulate` requires a *function* to be passed in for the control inputs, `u`, 
+# because the default integrator used in `SINDy.simulate` uses adaptive time-stepping. 
+# We show what to do in the case when you do not know the functional form for the control inputs in the example following this one.
 
 # Evolve the new initial condition in time with the SINDy model
 x_test_sim = model.simulate(x0_test, t_test, u = u_fun, integrator_kws = integrator_keywords)
