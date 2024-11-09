@@ -44,9 +44,9 @@ t_data = np.arange(0, t_end_data, dt)
 t_data_span = (t_data[0], t_data[-1])
 x_data = []
 u_data = []
-n_traj = 1000
+n_traj = 800
 for i in range(n_traj):
-    u_amp_data = np.random.uniform(10, 100)
+    u_amp_data = np.random.uniform(0, 100)
     u_freq_data = np.random.uniform(0, 5)
     u_fun = lambda t: u_amp_data * np.sin(2 * np.pi * u_freq_data * t)
     x0_data = [np.random.uniform(-2, 2), np.random.uniform(-2, 2)]
@@ -65,7 +65,6 @@ for i in range(n_traj):
 #plt.show()
 #plt.plot(t_data, u_data[0])
 #plt.show()
-
 
 # Split the dataset into training and calibration sets
 # TODO: make this a function
@@ -86,6 +85,11 @@ u_cal = u_data[D1:D1+D2]
 x_val = x_data[D1+D2:]
 u_val = u_data[D1+D2:]
 
+# TODO: Add noise to training data?
+for i in range(D1):
+    for j in range(x_train[i].shape[0]):
+        x_train[i][j] = x_train[i][j] + np.random.normal(0.0, 0.4, (x_train[i].shape[1]))
+
 # Instantiate and fit the SINDYc model
 # Generalized Library
 poly_library_x = ps.IdentityLibrary() # ps.PolynomialLibrary(degree = 1)
@@ -100,17 +104,41 @@ generalized_library = ps.GeneralizedLibrary(
     inputs_per_library = [[0,1], [0,1], [2]],
 )
 
+# Specify the optimizer
+optimizer = ps.STLSQ(threshold = 0.005)
+
 model = ps.SINDy(
-    optimizer = ps.STLSQ(threshold = 0.005),
+    optimizer = optimizer,
     feature_library = generalized_library,
 )
 model.fit(x_train, u = u_train, t = dt)
 model.print()
 print("Feature names:\n", model.get_feature_names())
 
+# Test constraints
+constraint_lhs = np.zeros((2, 2 * model.n_output_features_))
+Theta_0 = model.get_regressor(np.array([[0.0,0.0]]), u = np.array([[0.0]]))
+constraint_lhs[0,:model.n_output_features_] = Theta_0
+constraint_lhs[1,model.n_output_features_:] = Theta_0
+
+optimizer_cnstr = ps.ConstrainedSR3(
+    constraint_rhs = np.array([0.0, 0.0]), 
+    constraint_lhs = constraint_lhs,
+    equality_constraints = True
+)
+model_cnstr = ps.SINDy(
+    optimizer = optimizer_cnstr,
+    feature_library = generalized_library,
+)
+model_cnstr.fit(x_train, u = u_train, t = dt)
+model_cnstr.print()
+print("Feature names:\n", model_cnstr.get_feature_names())
+
+model = model_cnstr
+
 # TESTING: testing the control affine form ################################
-"""
-Xt = np.array([[10.0,2.0]])
+#"""
+Xt = np.array([[0.0,2.0]])
 Ut = np.array([[5.0]])
 Theta = model.get_regressor(Xt, u = np.array([[1.0]]))
 coeff = model.optimizer.coef_
@@ -135,7 +163,7 @@ for i in range(len(Err[0])):
         print("f_of_x + g_of_x * Ut = ", f_of_x + g_of_x * Ut)
         print("Theta @ coeff.T = ", model.get_regressor(Xt, Ut) @ coeff.T)
         raise ValueError("f_of_x + g_of_x * Ut != Theta @ coeff.T; Check if the model is control affine")
-"""
+#"""
 ###########################################################################
 
 ## Assess results on a test trajectory
@@ -232,9 +260,16 @@ plt.show(block=True)
 plt.pause(0.001)
 
 # TODO: Save the model
-with open('./control_affine_models/saved_models/' + 'inverted_pendulum_sindy', 'wb') as file:
+with open('./control_affine_models/saved_models/' + 'model_inverted_pendulum_sindy', 'wb') as file:
 	pickle.dump(model, file)
 
+trajectory_data = {'x_cal': x_cal, 'u_cal': u_cal, 'x_val': x_val, 'u_val': u_val, 'dt': dt}
+with open('./control_affine_models/trajectory_data/' + 'traj_inverted_pendulum_sindy', 'wb') as file:
+	pickle.dump(trajectory_data, file)     
+
 # Testing
-with open('./control_affine_models/saved_models/' + 'inverted_pendulum_sindy', 'rb') as file:
+with open('./control_affine_models/saved_models/' + 'model_inverted_pendulum_sindy', 'rb') as file:
 	model2 = pickle.load(file)
+     
+with open('./control_affine_models/trajectory_data/' + 'traj_inverted_pendulum_sindy', 'rb') as file:
+    trajectory_data2 = pickle.load(file)
