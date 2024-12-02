@@ -10,9 +10,12 @@ from scipy.linalg import LinAlgWarning
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import Lasso
 import pickle
+import dill
 import pysindy as ps
 
 import math
+
+from test_picklable import *
 
 t_end_data = 5
 t_end_test = 5
@@ -44,7 +47,7 @@ t_data = np.arange(0, t_end_data, dt)
 t_data_span = (t_data[0], t_data[-1])
 x_data = []
 u_data = []
-n_traj = 800
+n_traj = 2000
 for i in range(n_traj):
     u_amp_data = np.random.uniform(0, 100)
     u_freq_data = np.random.uniform(0, 5)
@@ -68,8 +71,8 @@ for i in range(n_traj):
 
 # Split the dataset into training and calibration sets
 # TODO: make this a function
-D1 = 50 #math.floor(n_traj * 0.02) # Size of the training set
-D2 = 600 #n_traj - D1  # Size of the calibration set
+D1 = 500 #math.floor(n_traj * 0.02) # Size of the training set
+D2 = 1000 #n_traj - D1  # Size of the calibration set
 D3 = n_traj - D1 - D2
 
 # Random shuffling
@@ -104,37 +107,40 @@ generalized_library = ps.GeneralizedLibrary(
     inputs_per_library = [[0,1], [0,1], [2]],
 )
 
-# Specify the optimizer
-optimizer = ps.STLSQ(threshold = 0.005)
-
-model = ps.SINDy(
-    optimizer = optimizer,
+# Unconstrained model
+model_uc = ps.SINDy(
+    optimizer = ps.STLSQ(threshold = 0.005),
     feature_library = generalized_library,
 )
-model.fit(x_train, u = u_train, t = dt)
-model.print()
-print("Feature names:\n", model.get_feature_names())
+model_uc.fit(x_train, u = u_train, t = dt)
+model_uc.print()
+print("Feature names:\n", model_uc.get_feature_names())
 
-# Test constraints
-constraint_lhs = np.zeros((2, 2 * model.n_output_features_))
-Theta_0 = model.get_regressor(np.array([[0.0,0.0]]), u = np.array([[0.0]]))
-constraint_lhs[0,:model.n_output_features_] = Theta_0
-constraint_lhs[1,model.n_output_features_:] = Theta_0
+# Fit the model with constraints
+constraint_lhs = np.zeros((2, 2 * model_uc.n_output_features_))
+Theta_0 = model_uc.get_regressor(np.array([[0.0,0.0]]), u = np.array([[0.0]]))
+constraint_lhs[0,:model_uc.n_output_features_] = Theta_0
+constraint_lhs[1,model_uc.n_output_features_:] = Theta_0
 
 optimizer_cnstr = ps.ConstrainedSR3(
     constraint_rhs = np.array([0.0, 0.0]), 
     constraint_lhs = constraint_lhs,
     equality_constraints = True
 )
-model_cnstr = ps.SINDy(
+model = ps.SINDy(
     optimizer = optimizer_cnstr,
     feature_library = generalized_library,
 )
-model_cnstr.fit(x_train, u = u_train, t = dt)
-model_cnstr.print()
-print("Feature names:\n", model_cnstr.get_feature_names())
+model.fit(x_train, u = u_train, t = dt)
+model.print()
+print("Feature names:\n", model.get_feature_names())
 
-model = model_cnstr
+#unpicklable_attr = remove_unpicklable(model)
+
+# Verify the constraints are met
+Theta = model.get_regressor(np.array([[0.0,0.0]]), u = np.array([[0.0]]))
+coeff = model.optimizer.coef_
+assert np.all(abs(Theta @ coeff.T - [0.0, 0.0]) < 1e-10)
 
 # TESTING: testing the control affine form ################################
 #"""
@@ -259,9 +265,9 @@ for i in range(x_test.shape[1]):
 plt.show(block=True)
 plt.pause(0.001)
 
-# TODO: Save the model
-with open('./control_affine_models/saved_models/' + 'model_inverted_pendulum_sindy', 'wb') as file:
-	pickle.dump(model, file)
+# Save the model
+with open('./control_affine_models/saved_models/model_inverted_pendulum_sindy', 'wb') as file:
+    dill.dump(model, file)
 
 trajectory_data = {'x_cal': x_cal, 'u_cal': u_cal, 'x_val': x_val, 'u_val': u_val, 'dt': dt}
 with open('./control_affine_models/trajectory_data/' + 'traj_inverted_pendulum_sindy', 'wb') as file:
@@ -269,7 +275,7 @@ with open('./control_affine_models/trajectory_data/' + 'traj_inverted_pendulum_s
 
 # Testing
 with open('./control_affine_models/saved_models/' + 'model_inverted_pendulum_sindy', 'rb') as file:
-	model2 = pickle.load(file)
+	model2 = dill.load(file)
      
 with open('./control_affine_models/trajectory_data/' + 'traj_inverted_pendulum_sindy', 'rb') as file:
     trajectory_data2 = pickle.load(file)
