@@ -30,11 +30,13 @@ integrator_keywords["method"] = "LSODA"
 integrator_keywords["atol"] = 1e-9
 
 # Randomized initial condition
-def x0_fun(): return [0.0, np.random.uniform(-10, 10), np.random.uniform(-np.pi, np.pi), np.random.uniform(-2, 2), np.random.uniform(-np.pi, np.pi), np.random.uniform(-2, 2)]
+def x0_fun(): return [0.0, np.random.uniform(-10, 10), 
+                      np.random.uniform(-np.pi, np.pi), np.random.uniform(-np.pi * 2, np.pi * 2), 
+                      np.random.uniform(-np.pi, np.pi), np.random.uniform(-np.pi * 2, np.pi * 2)]
 
 # Range of the amplitudes and frequencies of the randomized sine inputs
 u_amp_range = [0, 100]
-u_freq_range = [0, 6]
+u_freq_range = [0, 8]
 
 # Model parameters
 M = 5.0
@@ -52,8 +54,8 @@ def double_inverted_pendulum(t, state, u_fun):
 
     x, x_dot, theta_1, theta_1_dot, theta_2, theta_2_dot = state
 
-    theta_1 = wrapTo2pi(theta_1)
-    theta_2 = wrapTo2pi(theta_2)
+    #theta_1 = wrapTopi(theta_1)
+    #theta_2 = wrapTopi(theta_2)
 
     u = u_fun(t)
 
@@ -80,19 +82,10 @@ def double_inverted_pendulum(t, state, u_fun):
     c = np.array([b1 + dL_dx + u, b2 + dL_da, b3 + dL_db])
     
     # Compute state_dot = np.linalg.inv(A) @ c
-    det_A = np.linalg.det(A)
-
-    Ax = np.copy(A)
-    Ax[:, 0] = c
-    x_ddot = np.linalg.det(Ax) / det_A
-
-    Aa = np.copy(A)
-    Aa[:, 1] = c
-    theta_1_ddot = np.linalg.det(Aa) / det_A
-
-    Ab = np.copy(A)
-    Ab[:, 2] = c
-    theta_2_ddot = np.linalg.det(Ab) / det_A
+    state_ddot = np.linalg.inv(A) @ c
+    x_ddot = state_ddot[0]
+    theta_1_ddot = state_ddot[1]
+    theta_2_ddot = state_ddot[2]
 
     return [x_dot, x_ddot, theta_1_dot, theta_1_ddot, theta_2_dot, theta_2_ddot]
 
@@ -100,7 +93,7 @@ def double_inverted_pendulum(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 500
+n_traj_train = 100
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(double_inverted_pendulum, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -112,19 +105,20 @@ x_train, x_dot_train, u_train = gen_trajectory_dataset(double_inverted_pendulum,
 
 # Instantiate and fit the SINDYc model
 # Generalized Library
-#poly_library_x_1 = ps.PolynomialLibrary(degree = 1)
+poly_library_x_1 = ps.PolynomialLibrary(degree = 1)
 poly_library_x_2 = ps.PolynomialLibrary(degree = 2)
-fourier_library_x_4 = ps.FourierLibrary(n_frequencies = 4)
-fourier_library_x_2 = ps.FourierLibrary(n_frequencies = 2)
+fourier_library_x_4 = ps.FourierLibrary(n_frequencies = 1)
+fourier_library_x_2 = ps.FourierLibrary(n_frequencies = 1)
 poly_library_u = ps.IdentityLibrary() #ps.PolynomialLibrary(degree = 1) # assume control affine
 
 # Initialize the generalized library such that it's control affine
 generalized_library = ps.GeneralizedLibrary(
-    [poly_library_x_2,
-     fourier_library_x_2,
-     fourier_library_x_2 * fourier_library_x_2,
-     #fourier_library_x_2 * fourier_library_x_2 * fourier_library_x_2,
-     poly_library_u
+    [ps.PolynomialLibrary(degree = 2),
+     ps.FourierLibrary(n_frequencies = 3),
+     ps.FourierLibrary(n_frequencies = 3) * ps.FourierLibrary(n_frequencies = 3),
+     #ps.PolynomialLibrary(degree = 2) * ps.FourierLibrary(n_frequencies = 2),
+     #ps.PolynomialLibrary(degree = 2) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     ps.IdentityLibrary()
     ],
     tensor_array = [[0,1,0,1], [0,0,1,1], [1,1,0,0], [1,0,1,0]],
     inputs_per_library = [[1,3,5], [2,4], [2,4], [6]]

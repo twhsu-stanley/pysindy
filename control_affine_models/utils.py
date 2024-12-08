@@ -3,8 +3,9 @@ from scipy.integrate import solve_ivp
 import pysindy as ps
 import matplotlib.pyplot as plt
 
-def wrapTo2pi(ang):
-    ang = ang % (2*np.pi)
+def wrapToPi(ang):
+    """maps ang to [-pi, pi)"""
+    ang = (ang + np.pi) % (2 * np.pi) - np.pi
     return ang
 
 def gen_trajectory_dataset(dynamical_system, x0_fun, n_traj, time_horzn, dt, u_amp_range, u_freq_range, ang_ind = [], **integrator_keywords):
@@ -45,7 +46,7 @@ def gen_trajectory_dataset(dynamical_system, x0_fun, n_traj, time_horzn, dt, u_a
 
         if len(ang_ind) > 0:
             for i in ang_ind:
-                x_traj[:,i] = wrapTo2pi(x_traj[:,i])
+                x_traj[:,i] = wrapToPi(x_traj[:,i])
 
         x_data.append(x_traj)
         x_dot_data.append(x_dot_traj)
@@ -76,7 +77,7 @@ def gen_single_trajectory(dynamical_system, x0, u_fun, time_horzn, dt, ang_ind =
 
     if len(ang_ind) > 0:
         for i in ang_ind:
-            x_traj[:,i] = wrapTo2pi(x_traj[:,i])
+            x_traj[:,i] = wrapToPi(x_traj[:,i])
 
     return x_traj, x_dot_traj, u_fun(time)
 
@@ -88,10 +89,10 @@ def test_model_prediction(dynamical_system, model, x0, u_fun, time_horzn, dt, an
     x_test, x_dot_test, u_test = gen_single_trajectory(dynamical_system, x0, u_fun, time_horzn, dt, ang_ind, **integrator_keywords)
 
     # Predict derivatives using the learned model
-    x_dot_test_predicted = model.predict(x_test, u = u_test[0])
+    x_dot_test_predicted = model.predict(x_test, u = u_test)
 
     # Compare SINDy-predicted derivatives with numerical derivatives
-    print("RMSE = %f" % np.sqrt(np.mean(np.square(x_dot_test_predicted - x_dot_test))))
+    #print("RMSE = %f" % np.sqrt(np.mean(np.square(x_dot_test_predicted[:, i] - x_dot_test[:, i]))))
 
     # Compute derivatives with a finite difference method, for comparison
     #x_dot_test_computed = model.differentiate(x_test, t = dt)
@@ -104,11 +105,15 @@ def test_model_prediction(dynamical_system, model, x0, u_fun, time_horzn, dt, an
         axs[i].legend()
         axs[i].set(xlabel="t", ylabel=r"$\dot x_{}$".format(i))
 
-    fig, axs = plt.subplots(x_test.shape[1], 1, sharex=True, figsize=(7, 9))
+    fig, axs = plt.subplots(x_test.shape[1] + 1, 1, sharex=True, figsize=(7, 9))
     for i in range(x_test.shape[1]):
         axs[i].plot(t_test, x_test[:, i], "k", label="ground truth state")
         axs[i].legend()
         axs[i].set(xlabel="t", ylabel=r"$x_{}$".format(i))
+    axs[x_test.shape[1]].plot(t_test, u_test, "k", label="control input")
+    axs[x_test.shape[1]].legend()
+    axs[x_test.shape[1]].set(xlabel="t", ylabel="u")
+
     fig.show()
 
 def check_control_affine(model):
@@ -137,8 +142,51 @@ def check_control_affine(model):
     g_of_x = Theta[:,idx_u] @ coeff[:,idx_u].T
 
     Err = abs(f_of_x + g_of_x * Ut - model.get_regressor(Xt, Ut) @ coeff.T)
+
+    control_affine = True
     for i in range(len(Err[0])):
         if Err[0][i] > 1e-2:
             print("f_of_x + g_of_x * Ut = ", f_of_x + g_of_x * Ut)
             print("Theta @ coeff.T = ", model.get_regressor(Xt, Ut) @ coeff.T)
+            control_affine = control_affine and False
             raise ValueError("f_of_x + g_of_x * Ut != Theta @ coeff.T; Check if the model is control affine")
+    
+    return control_affine
+
+def test_conformal_prediction(dynamical_system, model,
+                              x0_fun, time_horzn, dt, u_amp_range, u_freq_range,
+                              ang_ind = [], n_traj_cal = 100, n_traj_val = 100, alpha = 0.05,
+                              **integrator_keywords):
+    """Test run of conformal prediction on the modeling error"""
+
+    # Generate the calibration dataset
+    x_cal, x_dot_cal, u_cal = gen_trajectory_dataset(dynamical_system, x0_fun, n_traj_cal, time_horzn, dt,
+                                        u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
+    # Generate the validation dataset
+    x_val, x_dot_val, u_val = gen_trajectory_dataset(dynamical_system, x0_fun, n_traj_val, time_horzn, dt,
+                                        u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
+
+    # Compute non-conformity scores
+    nc_score = []
+    for i in range(n_traj_cal):
+        #err = (model.predict(x_cal[i], u = u_cal[i]) - model.differentiate(x_cal[i], t = dt))
+        err = (model.predict(x_cal[i], u = u_cal[i]) - x_dot_cal[i])
+        R = np.linalg.norm(err, 2, axis = 1)
+        nc_score.extend(R)
+
+    # Compute the quantile
+    n = len(nc_score)
+    quantile = np.quantile(nc_score, np.ceil((n + 1) * (1 - alpha)) / n, interpolation="higher")
+    print("Quantile for alpha = %5.3f is %5.3f" % (alpha, quantile))
+
+    # Compute the empirical coverage
+    emp_scores = []
+    for i in range(n_traj_val):
+        #err = (model.predict(x_val[i], u = u_val[i]) - model.differentiate(x_val[i], t = dt))
+        err = (model.predict(x_val[i], u = u_val[i]) - x_dot_val[i])
+        R = np.linalg.norm(err, 2, axis = 1)
+        emp_scores.extend(R)
+    emp_coverage = sum(i < quantile for i in emp_scores) / len(emp_scores)
+    print("Empirical Coverage = %5.3f vs. 1-alpha = %5.3f" % (emp_coverage, 1- alpha))
+
+    return quantile
