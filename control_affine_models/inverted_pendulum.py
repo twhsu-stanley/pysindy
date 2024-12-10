@@ -15,8 +15,6 @@ import pysindy as ps
 
 import math
 
-from test_picklable import *
-
 t_end_data = 5
 t_end_test = 5
 
