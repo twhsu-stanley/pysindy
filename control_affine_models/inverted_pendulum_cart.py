@@ -20,7 +20,7 @@ np.random.seed(100)
 
 # Set up simulation parameters
 time_horzn = 2.0
-dt = 0.001
+dt = 0.01
 ang_ind = [2]
 
 # Initialize integrator keywords for solve_ivp to replicate the odeint defaults
@@ -61,7 +61,7 @@ def inverted_pendulum_cart(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 1000
+n_traj_train = 20000
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(inverted_pendulum_cart, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -80,14 +80,14 @@ x_train, x_dot_train, u_train = gen_trajectory_dataset(inverted_pendulum_cart, x
 # Initialize the generalized library such that it's control affine
 generalized_library = ps.GeneralizedLibrary(
     [ps.PolynomialLibrary(degree = 2),
-     ps.FourierLibrary(n_frequencies = 2),
-     ps.FourierLibrary(n_frequencies = 2) * ps.FourierLibrary(n_frequencies = 2),
-     #ps.FourierLibrary(n_frequencies = 2) * ps.FourierLibrary(n_frequencies = 2) * ps.FourierLibrary(n_frequencies = 2),
+     ps.FourierLibrary(n_frequencies = 1),
+     ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.IdentityLibrary() # for control input
     ],
-    tensor_array = [[0,1,0,1], [0,0,1,1], [1,1,0,0], [1,0,1,0]],
-    #tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]],
-    inputs_per_library = [[1,3], [2], [2], [4]]
+    #tensor_array = [[0,1,0,1], [0,0,1,1], [1,1,0,0], [1,0,1,0]],
+    tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]],
+    inputs_per_library = [[1,3], [2], [2], [2], [4]]
 )
 
 # Unconstrained model
@@ -99,7 +99,10 @@ model_uc.fit(x_train, x_dot = x_dot_train, u = u_train, t = dt)
 model_uc.print()
 print("Feature names:\n", model_uc.get_feature_names())
 
+model = model_uc
+
 # Fit the model with constraints at equilibrium points
+"""
 n_features = model_uc.n_output_features_
 constraint_lhs = np.zeros((4, 4 * n_features))
 Theta_0 = model_uc.get_regressor(np.zeros((1,4)), u = np.array([[0.0]]))
@@ -125,6 +128,7 @@ print("Feature names:\n", model.get_feature_names())
 coeff = model.optimizer.coef_
 Theta = model.get_regressor(np.zeros((1,4)), u = np.array([[0.0]]))
 #assert np.all(abs(Theta @ coeff.T - np.zeros((4,))) < 1e-1)
+"""
 
 control_affine = check_control_affine(model)
 assert control_affine is True
@@ -138,8 +142,8 @@ u_fun = lambda t: u_amp_data * np.sin(2 * np.pi * u_freq_data * t)
 test_model_prediction(inverted_pendulum_cart, model, x0, u_fun, time_horzn, dt, ang_ind, **integrator_keywords)
 
 ## Test Conformal Prediction
-n_traj_cal = 100
-n_traj_val = 100
+n_traj_cal = 200
+n_traj_val = 200
 alpha = 0.05
 
 quantile = test_conformal_prediction(inverted_pendulum_cart, model, x0_fun, time_horzn, dt, u_amp_range, u_freq_range,
