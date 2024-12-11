@@ -61,7 +61,7 @@ def inverted_pendulum_cart(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 20000
+n_traj_train = 200
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(inverted_pendulum_cart, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -83,11 +83,13 @@ generalized_library = ps.GeneralizedLibrary(
      ps.FourierLibrary(n_frequencies = 1),
      ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.IdentityLibrary() # for control input
     ],
     #tensor_array = [[0,1,0,1], [0,0,1,1], [1,1,0,0], [1,0,1,0]],
-    tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]],
-    inputs_per_library = [[1,3], [2], [2], [2], [4]]
+    #tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]],
+    tensor_array = [[0,1,0,0,0,1], [0,0,1,0,0,1], [0,0,0,1,0,1], [0,0,0,0,1,1], [1,1,0,0,0,0], [1,0,1,0,0,0], [1,0,0,1,0,0], [1,0,0,0,1,0]],
+    inputs_per_library = [[1,3], [2], [2], [2], [2], [4]]
 )
 
 # Unconstrained model
