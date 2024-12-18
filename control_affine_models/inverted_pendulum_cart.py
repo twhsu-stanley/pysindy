@@ -33,6 +33,8 @@ integrator_keywords["atol"] = 1e-9
 def x0_fun(): return [0.0, np.random.uniform(-10, 10), 
                       np.random.uniform(-np.pi/2, np.pi/2), np.random.uniform(-np.pi*2, np.pi*2)]
 
+def x0_zero(): return [0.0, 0.0, 0.0, 0.0]
+
 # Range of the amplitudes and frequencies of the randomized sine inputs
 u_amp_range = [0, 100]
 u_freq_range = [0, 5]
@@ -61,10 +63,17 @@ def inverted_pendulum_cart(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 200
+n_traj_train = 20
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(inverted_pendulum_cart, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
+
+x_zero, x_dot_zero, u_zero = gen_trajectory_dataset(inverted_pendulum_cart, x0_zero, n_traj_train, time_horzn, dt, 
+                                          [0.0, 0.0], [0.0, 0.0], ang_ind, **integrator_keywords)
+
+x_train = [*x_train, *x_zero]
+x_dot_train = [*x_dot_train, *x_dot_zero]
+u_train = [*u_train, *u_zero]
 
 #plt.plot(t_data, x_train[0])
 #plt.show()
