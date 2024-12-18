@@ -63,7 +63,7 @@ def inverted_pendulum_cart(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 20
+n_traj_train = 2000
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(inverted_pendulum_cart, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -151,6 +151,10 @@ u_amp_data = np.random.uniform(0, 100)
 u_freq_data = np.random.uniform(0, 5)
 u_fun = lambda t: u_amp_data * np.sin(2 * np.pi * u_freq_data * t)
 test_model_prediction(inverted_pendulum_cart, model, x0, u_fun, time_horzn, dt, ang_ind, **integrator_keywords)
+
+x0 = x0_zero()
+u_zero = lambda t: 0.0 * t
+test_model_prediction(inverted_pendulum_cart, model, x0, u_zero, time_horzn, dt, ang_ind, **integrator_keywords)
 
 ## Test Conformal Prediction
 n_traj_cal = 200
