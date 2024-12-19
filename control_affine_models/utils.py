@@ -154,6 +154,27 @@ def check_control_affine(model):
     
     return control_affine
 
+def set_derivative_coeff(model, idx, idx_d):
+    """If a state x[idx_d] is known to be the time derivative of another state x[idx], 
+       set all its coefficients to zeros except for the one corresponds to x1"""
+    assert len(idx) == len(idx_d)
+    # Example: idx = [0,2] and idx_d = [1,3] means x1 (resp. x3) is the time deriv of x0 (resp. x2)
+    
+    coeff = model.optimizer.coef_
+    feature_names = model.get_feature_names()
+    
+    for i in range(len(idx)):  
+        k = feature_names.index('x' + str(idx_d[i]))
+        for j in range(len(feature_names)):
+            if j == k:
+                coeff[idx[i], j] = 1.0
+            else:
+                coeff[idx[i], j] = 0.0
+
+    model.optimizer.coef_ = coeff
+
+    return model
+
 def test_conformal_prediction(dynamical_system, model,
                               x0_fun, time_horzn, dt, u_amp_range, u_freq_range,
                               ang_ind = [], n_traj_cal = 100, n_traj_val = 100, alpha = 0.05,
