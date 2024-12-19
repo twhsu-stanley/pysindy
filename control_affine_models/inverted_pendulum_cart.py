@@ -16,7 +16,7 @@ import pysindy as ps
 from utils import *
 
 # Seed the random number generators for reproducibility
-np.random.seed(100)
+#np.random.seed(100)
 
 # Set up simulation parameters
 time_horzn = 2.0
@@ -63,8 +63,8 @@ def inverted_pendulum_cart(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 2000
-n_traj_zero = 50
+n_traj_train = 3000
+n_traj_zero = 100
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(inverted_pendulum_cart, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -146,6 +146,7 @@ control_affine = check_control_affine(model)
 assert control_affine is True
 
 model = set_derivative_coeff(model, [0,2], [1,3]) #x1 (resp. x3) is the time deriv of x0 (resp. x2)
+model.print()
 
 ## Assess results on a test trajectory
 # Evolve the equations in time using a different initial condition
