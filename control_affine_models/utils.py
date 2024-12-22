@@ -178,6 +178,7 @@ def set_derivative_coeff(model, idx, idx_d):
 def test_conformal_prediction(dynamical_system, model,
                               x0_fun, time_horzn, dt, u_amp_range, u_freq_range,
                               ang_ind = [], n_traj_cal = 100, n_traj_val = 100, alpha = 0.05,
+                              norm = 1,
                               **integrator_keywords):
     """Test run of conformal prediction on the modeling error"""
 
@@ -193,7 +194,7 @@ def test_conformal_prediction(dynamical_system, model,
     for i in range(n_traj_cal):
         #err = (model.predict(x_cal[i], u = u_cal[i]) - model.differentiate(x_cal[i], t = dt))
         err = (model.predict(x_cal[i], u = u_cal[i]) - x_dot_cal[i])
-        R = np.linalg.norm(err, 2, axis = 1)
+        R = np.linalg.norm(err, norm, axis = 1)
         nc_score.extend(R)
 
     # Compute the quantile

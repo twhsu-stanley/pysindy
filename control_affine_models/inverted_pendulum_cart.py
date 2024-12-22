@@ -164,9 +164,10 @@ test_model_prediction(inverted_pendulum_cart, model, x0, u_zero, time_horzn, dt,
 n_traj_cal = 200
 n_traj_val = 200
 alpha = 0.05
+norm = 1
 
 quantile = test_conformal_prediction(inverted_pendulum_cart, model, x0_fun, time_horzn, dt, u_amp_range, u_freq_range,
-                            ang_ind, n_traj_cal, n_traj_val, alpha, **integrator_keywords)
+                            ang_ind, n_traj_cal, n_traj_val, alpha, norm, **integrator_keywords)
 
 # Save the quantile and alpha as paramters under the model
 model_error = {"alpha": alpha, "quantile": quantile}
