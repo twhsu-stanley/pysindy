@@ -207,7 +207,7 @@ def test_conformal_prediction(dynamical_system, model,
     for i in range(n_traj_val):
         #err = (model.predict(x_val[i], u = u_val[i]) - model.differentiate(x_val[i], t = dt))
         err = (model.predict(x_val[i], u = u_val[i]) - x_dot_val[i])
-        R = np.linalg.norm(err, 2, axis = 1)
+        R = np.linalg.norm(err, norm, axis = 1)
         emp_scores.extend(R)
     emp_coverage = sum(i < quantile for i in emp_scores) / len(emp_scores)
     print("Empirical Coverage = %5.3f vs. 1-alpha = %5.3f" % (emp_coverage, 1- alpha))
