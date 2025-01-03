@@ -120,7 +120,6 @@ def test_model_prediction(dynamical_system, model, x0, u_fun, time_horzn, dt, an
 def check_control_affine(model):
     """Check if the model is in the control affine form"""
     # TODO: read dim of Xt and Ut from model
-    model.n_features_in_
     Xt = np.random.rand(1, model.n_features_in_-1)
     Ut = np.random.rand(1, model.n_control_features_) # TODO: or (model.n_control_features_, 1)
     #Xt = np.array([[0.0, 2.0, 0.5, 0.2, 3.0, 0.5]])
