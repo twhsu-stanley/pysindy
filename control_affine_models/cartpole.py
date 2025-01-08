@@ -19,7 +19,7 @@ from utils import *
 #np.random.seed(100)
 
 # Set up simulation parameters
-time_horzn = 2.0
+time_horzn = 1.0
 dt = 0.01
 ang_ind = [1]
 
@@ -46,11 +46,12 @@ L = 1 # length
 b = 0 # friction coeff
 g = 9.81
 
-def cartpole(t, state, u_fun):
+def cartpole_dyn(state, u):
     # Cart-pole (single inverted pendulum on a cart, 2-DOF)
-    z, theta, z_dot, theta_dot = state
+    # x_dot = f(x, u)
 
-    F = u_fun(t)
+    z, theta, z_dot, theta_dot = state
+    F = u
 
     det = M + m * (np.sin(theta)**2)
     z_ddot = (F - b * z_dot - m * L * (theta_dot**2) * np.sin(theta)  + 0.5 * m * g * np.sin(2 * theta)) / det
@@ -59,12 +60,17 @@ def cartpole(t, state, u_fun):
     
     return [z_dot, theta_dot, z_ddot, theta_ddot]
 
+def cartpole(t, state, u_fun):
+    # Cart-pole (single inverted pendulum on a cart, 2-DOF)
+    u = u_fun(t)
+    return cartpole_dyn(state, u)
+
 ## Train a SINDYc model using trajectory data
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 3000
-n_traj_zero = 100
+n_traj_train = 100#3000
+n_traj_zero = 10#00
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(cartpole, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -86,8 +92,7 @@ u_train = [*u_train, *u_zero]
 #plt.show()
 
 # Instantiate and fit the SINDYc model
-# Generalized Library
-# Initialize the generalized library such that it's control affine
+# Generalized Library (such that it's control affine)
 generalized_library = ps.GeneralizedLibrary(
     [ps.PolynomialLibrary(degree = 2),
      ps.FourierLibrary(n_frequencies = 1),
@@ -158,14 +163,25 @@ x0 = x0_zero()
 u_zero = lambda t: 0.0 * t
 test_model_prediction(cartpole, model, x0, u_zero, time_horzn, dt, ang_ind, **integrator_keywords)
 
-## Test Conformal Prediction
-n_traj_cal = 200
-n_traj_val = 200
-alpha = 0.05
-norm = 1
+## Compute conformal prediction quantile
+x_range = np.array([
+     [-1.0, 1.0],
+     [-np.pi/6, np.pi/6],
+     [-1.5, 1.5],
+     [-1.0, 1.0]
+])
 
-quantile = test_conformal_prediction(cartpole, model, x0_fun, time_horzn, dt, u_amp_range, u_freq_range,
-                            ang_ind, n_traj_cal, n_traj_val, alpha, norm, **integrator_keywords)
+u_range = np.array([
+     [-10.0, 10.0]
+])
+
+alpha = 0.05
+n_cal = 1000
+n_val = 1000
+norm = 2
+
+quantile = get_conformal_prediction_quantile(cartpole_dyn, model, x_range, u_range,
+                                      n_cal, n_val, alpha, norm)
 
 # Save the quantile and alpha as paramters under the model
 model_error = {"alpha": alpha, "quantile": quantile}

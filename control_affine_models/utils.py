@@ -212,3 +212,72 @@ def test_conformal_prediction(dynamical_system, model,
     print("Empirical Coverage = %5.3f vs. 1-alpha = %5.3f" % (emp_coverage, 1- alpha))
 
     return quantile
+
+def get_conformal_prediction_quantile(dynamical_system, model, x_range, u_range,
+                                      n_cal = 100, n_val = 100, alpha = 0.05, norm = 2):
+    """Get conformal prediction quantile using randomly sampled data"""
+
+    n_dim = x_range.shape[0]
+    n_control = u_range.shape[0]
+
+    # Compute non-conformity scores
+    nc_score = []
+    for i in range(n_cal):
+        # Random sampling of states and control iputs
+        x_cal = np.zeros(n_dim)
+        for j in range(n_dim):
+            x_cal[j] = np.random.uniform(x_range[j][0], x_range[j][1])
+        
+        u_cal = np.zeros(n_control)
+        for j in range(n_control):
+            u_cal[j] = np.random.uniform(u_range[j][0], u_range[j][1])
+        if n_control == 1:
+            u_cal = u_cal[0]
+
+        # x_dot by the true model
+        x_dot = dynamical_system(x_cal, u_cal)
+
+        # x_dot by the SINDy model
+        Theta = model.get_regressor(x_cal.reshape(1,n_dim), u_cal.reshape(1,n_control))
+        coeff = model.optimizer.coef_
+        x_dot_sindy = Theta @ coeff.T
+
+        # Compute modeling error (non-conformity score)
+        R = np.linalg.norm(x_dot_sindy[0][:] - x_dot, norm)
+        nc_score.append(R)
+
+    # Compute the quantile
+    n = len(nc_score)
+    quantile = np.quantile(nc_score, np.ceil((n + 1) * (1 - alpha)) / n, interpolation="higher")
+    print("Quantile for alpha = %5.3f is %5.3f" % (alpha, quantile))
+
+    # Compute the empirical coverage
+    emp_scores = []
+    for i in range(n_val):
+        # Random sampling of states and control iputs
+        x_val = np.zeros(n_dim)
+        for j in range(n_dim):
+            x_val[j] = np.random.uniform(x_range[j][0], x_range[j][1])
+        
+        u_val = np.zeros(n_control)
+        for j in range(n_control):
+            u_val[j] = np.random.uniform(u_range[j][0], u_range[j][1])
+        if n_control == 1:
+            u_val = u_val[0]
+
+        # x_dot by the true model
+        x_dot = dynamical_system(x_val, u_val)
+
+        # x_dot by the SINDy model
+        Theta = model.get_regressor(x_val.reshape(1,n_dim), u_val.reshape(1,n_control))
+        coeff = model.optimizer.coef_
+        x_dot_sindy = Theta @ coeff.T
+
+        # Compute modeling error (non-conformity score)
+        R = np.linalg.norm(x_dot_sindy[0][:] - x_dot, norm)
+        emp_scores.append(R)
+
+    emp_coverage = sum(k < quantile for k in emp_scores) / len(emp_scores)
+    print("Empirical Coverage = %5.3f vs. 1-alpha = %5.3f" % (emp_coverage, 1- alpha))
+
+    return quantile
