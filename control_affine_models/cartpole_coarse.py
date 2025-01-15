@@ -69,8 +69,8 @@ def cartpole(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 1000#3000
-n_traj_zero = 100#00
+n_traj_train = 8000
+n_traj_zero = 800
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(cartpole, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
