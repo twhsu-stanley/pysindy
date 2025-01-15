@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 import pysindy as ps
+import matplotlib
+matplotlib.use('TkAgg')  # Or 'Qt5Agg' if you installed PyQt5
 import matplotlib.pyplot as plt
 
 def wrapToPi(ang):
@@ -214,11 +216,16 @@ def test_conformal_prediction(dynamical_system, model,
     return quantile
 
 def get_conformal_prediction_quantile(dynamical_system, model, x_range, u_range,
-                                      n_cal = 100, n_val = 100, alpha = 0.05, norm = 2):
+                                      n_cal = 100, n_val = 100, alpha = 0.05, norm = 2,
+                                      normalization = None):
     """Get conformal prediction quantile using randomly sampled data"""
 
     n_dim = x_range.shape[0]
     n_control = u_range.shape[0]
+
+    if normalization is not None:
+        norm_inv = [norm ** -1 for norm in normalization]
+        Tx_inv = np.diag(norm_inv)
 
     # Compute non-conformity scores
     nc_score = []
@@ -243,7 +250,10 @@ def get_conformal_prediction_quantile(dynamical_system, model, x_range, u_range,
         x_dot_sindy = Theta @ coeff.T
 
         # Compute modeling error (non-conformity score)
-        R = np.linalg.norm(x_dot_sindy[0][:] - x_dot, norm)
+        if normalization is not None:
+            R = np.linalg.norm(Tx_inv @ (x_dot_sindy[0][:] - x_dot), norm)
+        else:
+            R = np.linalg.norm(x_dot_sindy[0][:] - x_dot, norm)
         nc_score.append(R)
 
     # Compute the quantile
@@ -274,7 +284,10 @@ def get_conformal_prediction_quantile(dynamical_system, model, x_range, u_range,
         x_dot_sindy = Theta @ coeff.T
 
         # Compute modeling error (non-conformity score)
-        R = np.linalg.norm(x_dot_sindy[0][:] - x_dot, norm)
+        if normalization is not None:
+            R = np.linalg.norm(Tx_inv @ (x_dot_sindy[0][:] - x_dot), norm)
+        else:
+            R = np.linalg.norm(x_dot_sindy[0][:] - x_dot, norm)
         emp_scores.append(R)
 
     emp_coverage = sum(k < quantile for k in emp_scores) / len(emp_scores)
