@@ -69,8 +69,8 @@ def cartpole(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 100#3000
-n_traj_zero = 10#00
+n_traj_train = 5000#3000
+n_traj_zero = 500#00
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(cartpole, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -164,11 +164,17 @@ u_zero = lambda t: 0.0 * t
 test_model_prediction(cartpole, model, x0, u_zero, time_horzn, dt, ang_ind, **integrator_keywords)
 
 ## Compute conformal prediction quantile
+z_max = 1.0
+theta_max = np.pi/6
+v_max = 1.5
+omega_max = 1.0
+x_norm = [z_max, theta_max, v_max, omega_max]
+
 x_range = np.array([
-     [-1.0, 1.0],
-     [-np.pi/6, np.pi/6],
-     [-1.5, 1.5],
-     [-1.0, 1.0]
+     [-z_max, z_max],
+     [-theta_max, theta_max],
+     [-v_max, v_max],
+     [-omega_max, omega_max]
 ])
 
 u_range = np.array([
@@ -181,10 +187,11 @@ n_val = 1000
 norm = 2
 
 quantile = get_conformal_prediction_quantile(cartpole_dyn, model, x_range, u_range,
-                                      n_cal, n_val, alpha, norm)
+                                      n_cal, n_val, alpha, norm,
+                                      normalization = x_norm)
 
 # Save the quantile and alpha as paramters under the model
-model_error = {"alpha": alpha, "quantile": quantile}
+model_error = {"alpha": alpha, "quantile": quantile, "norm": norm, "normalization": x_norm}
 model.model_error = model_error
 
 ## Save the model and dataset
