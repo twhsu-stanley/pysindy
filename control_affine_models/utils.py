@@ -106,18 +106,16 @@ def test_model_prediction(dynamical_system, model, x0, u_fun, time_horzn, dt, an
         axs[i].plot(t_test, x_dot_test_predicted[:, i], "r--", label="model prediction")
         axs[i].legend()
         axs[i].set(xlabel="t", ylabel=r"$\dot x_{}$".format(i))
-
-    fig2, axs2 = plt.subplots(x_test.shape[1] + 1, 1, sharex=True, figsize=(7, 9))
-    for i in range(x_test.shape[1]):
-        axs2[i].plot(t_test, x_test[:, i], "k", label="ground truth state")
-        axs2[i].legend()
-        axs2[i].set(xlabel="t", ylabel=r"$x_{}$".format(i))
-    axs2[x_test.shape[1]].plot(t_test, u_test, "k", label="control input")
-    axs2[x_test.shape[1]].legend()
-    axs2[x_test.shape[1]].set(xlabel="t", ylabel="u")
-
     fig.show()
-    fig2.show()
+    #fig2, axs2 = plt.subplots(x_test.shape[1] + 1, 1, sharex=True, figsize=(7, 9))
+    #for i in range(x_test.shape[1]):
+    #    axs2[i].plot(t_test, x_test[:, i], "k", label="ground truth state")
+    #    axs2[i].legend()
+    #    axs2[i].set(xlabel="t", ylabel=r"$x_{}$".format(i))
+    #axs2[x_test.shape[1]].plot(t_test, u_test, "k", label="control input")
+    #axs2[x_test.shape[1]].legend()
+    #axs2[x_test.shape[1]].set(xlabel="t", ylabel="u")
+    #fig2.show()
 
 def check_control_affine(model):
     """Check if the model is in the control affine form"""

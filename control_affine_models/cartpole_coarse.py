@@ -97,12 +97,12 @@ generalized_library = ps.GeneralizedLibrary(
     [ps.PolynomialLibrary(degree = 2),
      ps.FourierLibrary(n_frequencies = 1),
      ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
-     ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.IdentityLibrary() # for control input
     ],
-    tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]],
-    inputs_per_library = [[2,3], [1], [1], [1], [4]]
+    tensor_array = [[0,1,0,1], [0,0,1,1], [1,1,0,0], [1,0,1,0]],
+    inputs_per_library = [[2,3], [1], [1], [4]]
 )
 
 # Unconstrained model
@@ -170,5 +170,5 @@ with open('./control_affine_models/saved_models/model_cartpole_sindy_coarse', 'w
     dill.dump(model, file)
  
 # Testing
-with open('./control_affine_models/saved_models/' + 'model_cartpole_sindy_coars', 'rb') as file:
+with open('./control_affine_models/saved_models/' + 'model_cartpole_sindy_coarse', 'rb') as file:
 	model2 = dill.load(file)
