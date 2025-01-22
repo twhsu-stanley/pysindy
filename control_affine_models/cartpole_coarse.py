@@ -69,8 +69,8 @@ def cartpole(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 8000
-n_traj_zero = 800
+n_traj_train = 3000
+n_traj_zero = 300
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(cartpole, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -97,12 +97,12 @@ generalized_library = ps.GeneralizedLibrary(
     [ps.PolynomialLibrary(degree = 2),
      ps.FourierLibrary(n_frequencies = 1),
      ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
-     #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.IdentityLibrary() # for control input
     ],
-    tensor_array = [[0,1,0,1], [0,0,1,1], [1,1,0,0], [1,0,1,0]],
-    inputs_per_library = [[2,3], [1], [1], [4]]
+    tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0]], #, [1,0,0,1,0]
+    inputs_per_library = [[2,3], [1], [1], [1], [4]]
 )
 
 # Unconstrained model
@@ -164,6 +164,9 @@ quantile = get_conformal_prediction_quantile(cartpole_dyn, model, x_range, u_ran
 # Save the quantile and alpha as paramters under the model
 model_error = {"alpha": alpha, "quantile": quantile, "norm": norm, "normalization": x_norm}
 model.model_error = model_error
+
+model.feature_names = model.get_feature_names()
+model.coefficients = model.optimizer.coef_
 
 ## Save the model and dataset
 with open('./control_affine_models/saved_models/model_cartpole_sindy_coarse', 'wb') as file:

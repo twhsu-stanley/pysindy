@@ -194,6 +194,9 @@ quantile = get_conformal_prediction_quantile(cartpole_dyn, model, x_range, u_ran
 model_error = {"alpha": alpha, "quantile": quantile, "norm": norm, "normalization": x_norm}
 model.model_error = model_error
 
+model.feature_names = model.get_feature_names()
+model.coefficients = model.optimizer.coef_
+
 ## Save the model and dataset
 with open('./control_affine_models/saved_models/model_cartpole_sindy', 'wb') as file:
     dill.dump(model, file)
