@@ -2,7 +2,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 import pysindy as ps
 import matplotlib
-matplotlib.use('TkAgg')  # Or 'Qt5Agg' if you installed PyQt5
+#matplotlib.use('TkAgg')  # Or 'Qt5Agg' if you installed PyQt5
 import matplotlib.pyplot as plt
 
 def wrapToPi(ang):
