@@ -69,8 +69,8 @@ def cartpole(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 5000#3000
-n_traj_zero = 500#00
+n_traj_train = 5000
+n_traj_zero = 500
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(cartpole, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -192,14 +192,12 @@ quantile = get_conformal_prediction_quantile(cartpole_dyn, model, x_range, u_ran
 
 # Save the quantile and alpha as paramters under the model
 model_error = {"alpha": alpha, "quantile": quantile, "norm": norm, "normalization": x_norm}
-model.model_error = model_error
 
-model.feature_names_ = model.get_feature_names()
-model.coefficients_ = model.optimizer.coef_
+model_saved = {"feature_names": model.get_feature_names(), "coefficients": model.optimizer.coef_, "model_error": model_error}
 
 ## Save the model and dataset
 with open('./control_affine_models/saved_models/model_cartpole_sindy', 'wb') as file:
-    dill.dump(model, file)
+    dill.dump(model_saved, file)
  
 # Testing
 with open('./control_affine_models/saved_models/' + 'model_cartpole_sindy', 'rb') as file:
