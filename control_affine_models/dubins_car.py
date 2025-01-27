@@ -58,7 +58,7 @@ def dubins_car(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 5000
+n_traj_train = 1000
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(dubins_car, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -75,7 +75,7 @@ x_train, x_dot_train, u_train = gen_trajectory_dataset(dubins_car, x0_fun, n_tra
 # Instantiate and fit the SINDYc model
 # Generalized Library (such that it's control affine)
 generalized_library = ps.GeneralizedLibrary(
-    [ps.PolynomialLibrary(degree = 20),
+    [ps.PolynomialLibrary(degree = 4),
      #ps.FourierLibrary(n_frequencies = 1),
      ps.IdentityLibrary() # for control input
     ],
@@ -136,11 +136,12 @@ quantile = get_conformal_prediction_quantile(dubins_car_dyn, model, x_range, u_r
 
 # Save the quantile and alpha as paramters under the model
 model_error = {"alpha": alpha, "quantile": quantile, "norm": norm}
-model.model_error = model_error
+
+model_saved = {"feature_names": model.get_feature_names(), "coefficients": model.optimizer.coef_, "model_error": model_error}
 
 ## Save the model and dataset
 with open('./control_affine_models/saved_models/model_dubins_car_sindy', 'wb') as file:
-    dill.dump(model, file)
+    dill.dump(model_saved, file)
  
 # Testing
 with open('./control_affine_models/saved_models/' + 'model_dubins_car_sindy', 'rb') as file:
