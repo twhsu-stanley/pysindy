@@ -101,7 +101,7 @@ generalized_library = ps.GeneralizedLibrary(
      #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.IdentityLibrary() # for control input
     ],
-    tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0]], #, [1,0,0,1,0]
+    tensor_array = [[0,1,0,0,1], [0,0,1,0,1],  [1,1,0,0,0], [1,0,1,0,0]], #[0,0,0,1,1],#, [1,0,0,1,0]
     inputs_per_library = [[2,3], [1], [1], [1], [4]]
 )
 
@@ -163,15 +163,13 @@ quantile = get_conformal_prediction_quantile(cartpole_dyn, model, x_range, u_ran
 
 # Save the quantile and alpha as paramters under the model
 model_error = {"alpha": alpha, "quantile": quantile, "norm": norm, "normalization": x_norm}
-model.model_error = model_error
 
-model.feature_names_ = model.get_feature_names()
-model.coefficients_ = model.optimizer.coef_
+model_saved = {"feature_names": model.get_feature_names(), "coefficients": model.optimizer.coef_, "model_error": model_error}
 
 ## Save the model and dataset
-with open('./control_affine_models/saved_models/model_cartpole_sindy_coarse', 'wb') as file:
-    dill.dump(model, file)
+with open('./control_affine_models/saved_models/model_cartpole_sindy_coarse_2', 'wb') as file:
+    dill.dump(model_saved, file)
  
 # Testing
-with open('./control_affine_models/saved_models/' + 'model_cartpole_sindy_coarse', 'rb') as file:
+with open('./control_affine_models/saved_models/' + 'model_cartpole_sindy_coarse_2', 'rb') as file:
 	model2 = dill.load(file)
