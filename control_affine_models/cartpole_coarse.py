@@ -95,15 +95,27 @@ u_train = [*u_train, *u_zero]
 # Generalized Library (such that it's control affine)
 generalized_library = ps.GeneralizedLibrary(
     [ps.PolynomialLibrary(degree = 2),
-     ps.PolynomialLibrary(degree = 5), #ps.FourierLibrary(n_frequencies = 1),
-     ps.PolynomialLibrary(degree = 5) * ps.PolynomialLibrary(degree = 5), #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
-     ps.PolynomialLibrary(degree = 5) * ps.PolynomialLibrary(degree = 5) * ps.PolynomialLibrary(degree = 5), #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
-     #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     #ps.FourierLibrary(n_frequencies = 1),
+     ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.IdentityLibrary() # for control input
     ],
-    tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]], ##
+    tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]],
     inputs_per_library = [[2,3], [1], [1], [1], [4]]
 )
+"""
+generalized_library = ps.GeneralizedLibrary(
+    [ps.PolynomialLibrary(degree = 2),
+     ps.PolynomialLibrary(degree = 5),
+     ps.PolynomialLibrary(degree = 5) * ps.PolynomialLibrary(degree = 5),
+     ps.PolynomialLibrary(degree = 5) * ps.PolynomialLibrary(degree = 5) * ps.PolynomialLibrary(degree = 5), 
+     ps.IdentityLibrary() # for control input
+    ],
+    tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]],
+    inputs_per_library = [[2,3], [1], [1], [1], [4]]
+)
+"""
 
 # Unconstrained model
 model_uc = ps.SINDy(
