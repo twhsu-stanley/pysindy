@@ -58,7 +58,7 @@ def dubins_car(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 1000
+n_traj_train = 4000
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(dubins_car, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -75,7 +75,7 @@ x_train, x_dot_train, u_train = gen_trajectory_dataset(dubins_car, x0_fun, n_tra
 # Instantiate and fit the SINDYc model
 # Generalized Library (such that it's control affine)
 generalized_library = ps.GeneralizedLibrary(
-    [ps.PolynomialLibrary(degree = 4),
+    [ps.PolynomialLibrary(degree = 3),
      #ps.FourierLibrary(n_frequencies = 1),
      ps.IdentityLibrary() # for control input
     ],
