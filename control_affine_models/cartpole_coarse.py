@@ -10,7 +10,6 @@ from scipy.linalg import LinAlgWarning
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import Lasso
 import pickle
-import dill
 import pysindy as ps
 
 from utils import *
@@ -96,6 +95,19 @@ u_train = [*u_train, *u_zero]
 generalized_library = ps.GeneralizedLibrary(
     [ps.PolynomialLibrary(degree = 2),
      #ps.FourierLibrary(n_frequencies = 1),
+     #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
+     ps.IdentityLibrary() # for control input
+    ],
+    tensor_array = [[0,1,0,1], [0,0,1,1], [1,0,0,1], [1,1,0,0], [1,0,1,0]],
+    inputs_per_library = [[2,3], [1], [1], [4]]
+)
+"""
+# coarse: worked
+generalized_library = ps.GeneralizedLibrary(
+    [ps.PolynomialLibrary(degree = 2),
+     #ps.FourierLibrary(n_frequencies = 1),
      ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
@@ -104,7 +116,7 @@ generalized_library = ps.GeneralizedLibrary(
     tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]],
     inputs_per_library = [[2,3], [1], [1], [1], [4]]
 )
-"""
+# coarse 2: didn't work
 generalized_library = ps.GeneralizedLibrary(
     [ps.PolynomialLibrary(degree = 2),
      ps.PolynomialLibrary(degree = 5),
@@ -165,8 +177,8 @@ u_range = np.array([
 ])
 
 alpha = 0.05
-n_cal = 1000
-n_val = 1000
+n_cal = 500
+n_val = 500
 norm = 2
 
 quantile = get_conformal_prediction_quantile(cartpole_dyn, model, x_range, u_range,
@@ -180,8 +192,8 @@ model_saved = {"feature_names": model.get_feature_names(), "coefficients": model
 
 ## Save the model and dataset
 with open('./control_affine_models/saved_models/model_cartpole_sindy_coarse_2', 'wb') as file:
-    dill.dump(model_saved, file)
+    pickle.dump(model_saved, file)
  
 # Testing
 with open('./control_affine_models/saved_models/' + 'model_cartpole_sindy_coarse_2', 'rb') as file:
-	model2 = dill.load(file)
+	model2 = pickle.load(file)

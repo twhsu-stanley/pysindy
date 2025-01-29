@@ -10,7 +10,6 @@ from scipy.linalg import LinAlgWarning
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import Lasso
 import pickle
-import dill
 import pysindy as ps
 
 from utils import *
@@ -197,8 +196,8 @@ model_saved = {"feature_names": model.get_feature_names(), "coefficients": model
 
 ## Save the model and dataset
 with open('./control_affine_models/saved_models/model_cartpole_sindy', 'wb') as file:
-    dill.dump(model_saved, file)
+    pickle.dump(model_saved, file)
  
 # Testing
 with open('./control_affine_models/saved_models/' + 'model_cartpole_sindy', 'rb') as file:
-	model2 = dill.load(file)
+	model2 = pickle.load(file)
