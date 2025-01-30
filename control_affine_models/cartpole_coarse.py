@@ -68,8 +68,8 @@ def cartpole(t, state, u_fun):
 # Generate the training dataset
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 3000
-n_traj_zero = 300
+n_traj_train = 2000
+n_traj_zero = 200
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(cartpole, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -177,8 +177,8 @@ u_range = np.array([
 ])
 
 alpha = 0.05
-n_cal = 500
-n_val = 500
+n_cal = 1000
+n_val = 1000
 norm = 2
 
 quantile = get_conformal_prediction_quantile(cartpole_dyn, model, x_range, u_range,
