@@ -34,9 +34,6 @@ def x0_fun(): return [0.0, np.random.uniform(-10, 10),
 
 def x0_zero(): return [0.0, 0.0, 0.0, 0.0]
 
-# Range of the amplitudes and frequencies of the randomized sine inputs
-u_amp_range = [0, 100]
-u_freq_range = [0, 5]
 
 # Model parameters {"M": 1.0, "m": 1.0, "L": 0.5, "Kd": 10.0}
 m = 0.3 # pendulum mass
@@ -64,12 +61,56 @@ def cartpole(t, state, u_fun):
     u = u_fun(t)
     return cartpole_dyn(state, u)
 
-## Train a SINDYc model using trajectory data
+# Generate a dataset {x_dot_i , (x_i, u_i)}, i=1,...N
+num_samples = 500000 # size of the entire dataset
+num_samples_train = 498000 # size of training set
+num_samples_cal = 1000 # size of calibration set
+num_samples_val = 1000 # size of validation set
+assert num_samples_train + num_samples_cal + num_samples_val == num_samples
+
+z_max = 10.0
+theta_max = np.pi
+v_max = 30.0
+omega_max = np.pi * 3
+u_max = 60.0
+x_range = np.array([
+     [-z_max, z_max],
+     [-theta_max, theta_max],
+     [-v_max, v_max],
+     [-omega_max, omega_max]
+])
+u_range = np.array([
+     [-u_max, u_max]
+])
+x_samples = generate_samples(x_range, num_samples)
+u_samples = generate_samples(u_range, num_samples)
+x_dot_samples = np.zeros((num_samples, 4))
+for i in range(num_samples):
+    x_dot_samples[i,:] = cartpole_dyn(x_samples[i,:], u_samples[i,0])
+
+# Split the dataset into the training, calibration, and validation sets
+# Training set
+x_train = x_samples[:num_samples_train, :]
+u_train = u_samples[:num_samples_train, :]
+x_dot_train = x_dot_samples[:num_samples_train, :]
+# Calibration set
+x_cal = x_samples[num_samples_train:(num_samples_train+num_samples_cal), :]
+u_cal = u_samples[num_samples_train:(num_samples_train+num_samples_cal), :]
+x_dot_cal = x_dot_samples[num_samples_train:(num_samples_train+num_samples_cal), :]
+# Validation set
+x_val = x_samples[(num_samples_train+num_samples_cal):(num_samples_train+num_samples_cal+num_samples_val), :]
+u_val = u_samples[(num_samples_train+num_samples_cal):(num_samples_train+num_samples_cal+num_samples_val), :]
+x_dot_val = x_dot_samples[(num_samples_train+num_samples_cal):(num_samples_train+num_samples_cal+num_samples_val), :]
+
+###########################################################################################################
 # Generate the training dataset
+"""
 t_data = np.arange(0, time_horzn, dt)
 t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 2000
-n_traj_zero = 200
+n_traj_train = 1000
+n_traj_zero = 100
+u_amp_range = [0, 100]
+u_freq_range = [0, 5]
 
 x_train, x_dot_train, u_train = gen_trajectory_dataset(cartpole, x0_fun, n_traj_train, time_horzn, dt, 
                                           u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
@@ -80,15 +121,8 @@ x_zero, x_dot_zero, u_zero = gen_trajectory_dataset(cartpole, x0_zero, n_traj_ze
 x_train = [*x_train, *x_zero]
 x_dot_train = [*x_dot_train, *x_dot_zero]
 u_train = [*u_train, *u_zero]
-
-#plt.plot(t_data, x_train[0])
-#plt.show()
-#plt.plot(t_data, x_train[0][:,1], t_data, x_dot_train[0][:,0])
-#plt.show()
-#plt.plot(t_data, x_train[0][:,3], t_data, x_dot_train[0][:,2])
-#plt.show()
-#plt.plot(t_data, u_train[0])
-#plt.show()
+"""
+###########################################################################################################
 
 # Instantiate and fit the SINDYc model
 # Generalized Library (such that it's control affine)
@@ -104,24 +138,13 @@ generalized_library = ps.GeneralizedLibrary(
     inputs_per_library = [[2,3], [1], [1], [4]]
 )
 """
-# coarse: worked
+# This also worked
 generalized_library = ps.GeneralizedLibrary(
     [ps.PolynomialLibrary(degree = 2),
      #ps.FourierLibrary(n_frequencies = 1),
      ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
-     ps.IdentityLibrary() # for control input
-    ],
-    tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]],
-    inputs_per_library = [[2,3], [1], [1], [1], [4]]
-)
-# coarse 2: didn't work
-generalized_library = ps.GeneralizedLibrary(
-    [ps.PolynomialLibrary(degree = 2),
-     ps.PolynomialLibrary(degree = 5),
-     ps.PolynomialLibrary(degree = 5) * ps.PolynomialLibrary(degree = 5),
-     ps.PolynomialLibrary(degree = 5) * ps.PolynomialLibrary(degree = 5) * ps.PolynomialLibrary(degree = 5), 
      ps.IdentityLibrary() # for control input
     ],
     tensor_array = [[0,1,0,0,1], [0,0,1,0,1], [0,0,0,1,1], [1,1,0,0,0], [1,0,1,0,0], [1,0,0,1,0]],
@@ -134,7 +157,7 @@ model_uc = ps.SINDy(
     optimizer = ps.STLSQ(threshold = 0.01),
     feature_library = generalized_library,
 )
-model_uc.fit(x_train, x_dot = x_dot_train, u = u_train, t = dt)
+model_uc.fit(x_train, x_dot = x_dot_train, u = u_train)
 model_uc.print()
 print("Feature names:\n", model_uc.get_feature_names())
 
@@ -146,51 +169,34 @@ assert control_affine is True
 model = set_derivative_coeff(model, [0,1], [2,3]) #x2 (resp. x3) is the time deriv of x0 (resp. x1)
 model.print()
 
-## Assess results on a test trajectory
-# Evolve the equations in time using a different initial condition
+#  Assess results on a test trajectory #####################################################################
 x0 = x0_fun()
-u_amp_data = np.random.uniform(0, 100)
+u_amp_data = np.random.uniform(0, 10)
 u_freq_data = np.random.uniform(0, 5)
 u_fun = lambda t: u_amp_data * np.sin(2 * np.pi * u_freq_data * t)
 test_model_prediction(cartpole, model, x0, u_fun, time_horzn, dt, ang_ind, **integrator_keywords)
+###########################################################################################################
 
-x0 = x0_zero()
-u_zero = lambda t: 0.0 * t
-test_model_prediction(cartpole, model, x0, u_zero, time_horzn, dt, ang_ind, **integrator_keywords)
-
-## Compute conformal prediction quantile
+# Compute conformal prediction quantile
+alpha = 0.05
+norm = 2
+# These maxima below are used for normalization (Tx_inv)
+# Thus, they must be consistent with the maxima used in the neural CLF code
 z_max = 1.0
 theta_max = np.pi/6
 v_max = 1.5
 omega_max = 1.0
 x_norm = [z_max, theta_max, v_max, omega_max]
-
-x_range = np.array([
-     [-z_max, z_max],
-     [-theta_max, theta_max],
-     [-v_max, v_max],
-     [-omega_max, omega_max]
-])
-
-u_range = np.array([
-     [-10.0, 10.0]
-])
-
-alpha = 0.05
-n_cal = 1000
-n_val = 1000
-norm = 2
-
-quantile = get_conformal_prediction_quantile(cartpole_dyn, model, x_range, u_range,
-                                      n_cal, n_val, alpha, norm,
-                                      normalization = x_norm)
+quantile = get_conformal_prediction_quantile(cartpole_dyn, model, 
+                                             x_cal, u_cal, x_val, u_val,
+                                             alpha, norm = 2, normalization = x_norm)
 
 # Save the quantile and alpha as paramters under the model
 model_error = {"alpha": alpha, "quantile": quantile, "norm": norm, "normalization": x_norm}
 
 model_saved = {"feature_names": model.get_feature_names(), "coefficients": model.optimizer.coef_, "model_error": model_error}
 
-## Save the model and dataset
+# Save the model and dataset
 with open('./control_affine_models/saved_models/model_cartpole_sindy_coarse_2', 'wb') as file:
     pickle.dump(model_saved, file)
  
