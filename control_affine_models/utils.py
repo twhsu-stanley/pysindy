@@ -10,6 +10,16 @@ def wrapToPi(ang):
     ang = (ang + np.pi) % (2 * np.pi) - np.pi
     return ang
 
+def generate_samples(data_range, num_samples):
+    """Generates non-repeating samples within the specified ranges"""
+
+    data_dim = data_range.shape[0]
+
+    samples = np.random.uniform(low = [data_range[i][0] for i in range(data_dim)], 
+                                high = [data_range[i][1] for i in range(data_dim)], 
+                                size = (num_samples, data_dim))
+    return samples
+
 def gen_trajectory_dataset(dynamical_system, x0_fun, n_traj, time_horzn, dt, u_amp_range, u_freq_range, ang_ind = [], **integrator_keywords):
     """Generate a dataset of trajectories"""
     # dynamical_system: dynamical system
@@ -107,15 +117,15 @@ def test_model_prediction(dynamical_system, model, x0, u_fun, time_horzn, dt, an
         axs[i].legend()
         axs[i].set(xlabel="t", ylabel=r"$\dot x_{}$".format(i))
     fig.show()
-    #fig2, axs2 = plt.subplots(x_test.shape[1] + 1, 1, sharex=True, figsize=(7, 9))
-    #for i in range(x_test.shape[1]):
-    #    axs2[i].plot(t_test, x_test[:, i], "k", label="ground truth state")
-    #    axs2[i].legend()
-    #    axs2[i].set(xlabel="t", ylabel=r"$x_{}$".format(i))
-    #axs2[x_test.shape[1]].plot(t_test, u_test, "k", label="control input")
-    #axs2[x_test.shape[1]].legend()
-    #axs2[x_test.shape[1]].set(xlabel="t", ylabel="u")
-    #fig2.show()
+    fig2, axs2 = plt.subplots(x_test.shape[1] + 1, 1, sharex=True, figsize=(7, 9))
+    for i in range(x_test.shape[1]):
+        axs2[i].plot(t_test, x_test[:, i], "k", label="ground truth state")
+        axs2[i].legend()
+        axs2[i].set(xlabel="t", ylabel=r"$x_{}$".format(i))
+    axs2[x_test.shape[1]].plot(t_test, u_test, "k", label="control input")
+    axs2[x_test.shape[1]].legend()
+    axs2[x_test.shape[1]].set(xlabel="t", ylabel="u")
+    fig2.show()
 
 def check_control_affine(model):
     """Check if the model is in the control affine form"""
@@ -213,13 +223,21 @@ def test_conformal_prediction(dynamical_system, model,
 
     return quantile
 
-def get_conformal_prediction_quantile(dynamical_system, model, x_range, u_range,
-                                      n_cal = 100, n_val = 100, alpha = 0.05, norm = 2,
+def get_conformal_prediction_quantile(dynamical_system, model, 
+                                      x_cal, u_cal, x_val, u_val,
+                                      alpha = 0.05, norm = 2,
                                       normalization = None):
     """Get conformal prediction quantile using randomly sampled data"""
+    # dynamical_system: true model
+    # model: SINDy model
 
-    n_dim = x_range.shape[0]
-    n_control = u_range.shape[0]
+    x_dim = x_cal.shape[1]
+    u_dim = u_cal.shape[1]
+    assert x_dim == x_val.shape[1]
+    assert u_dim == u_val.shape[1]
+
+    num_samples_cal = x_cal.shape[0]
+    num_samples_val = x_val.shape[0]
 
     if normalization is not None:
         norm_inv = [norm ** -1 for norm in normalization]
@@ -227,23 +245,12 @@ def get_conformal_prediction_quantile(dynamical_system, model, x_range, u_range,
 
     # Compute non-conformity scores
     nc_score = []
-    for i in range(n_cal):
-        # Random sampling of states and control iputs
-        x_cal = np.zeros(n_dim)
-        for j in range(n_dim):
-            x_cal[j] = np.random.uniform(x_range[j][0], x_range[j][1])
-        
-        u_cal = np.zeros(n_control)
-        for j in range(n_control):
-            u_cal[j] = np.random.uniform(u_range[j][0], u_range[j][1])
-        if n_control == 1:
-            u_cal = u_cal[0]
-
+    for i in range(num_samples_cal):
         # x_dot by the true model
-        x_dot = dynamical_system(x_cal, u_cal)
+        x_dot = dynamical_system(x_cal[i,:], u_cal[i,0])
 
         # x_dot by the SINDy model
-        Theta = model.get_regressor(x_cal.reshape(1,n_dim), u_cal.reshape(1,n_control))
+        Theta = model.get_regressor(x_cal[i,:].reshape(1,x_dim), u_cal[i,0].reshape(1,u_dim))
         coeff = model.optimizer.coef_
         x_dot_sindy = Theta @ coeff.T
 
@@ -261,23 +268,12 @@ def get_conformal_prediction_quantile(dynamical_system, model, x_range, u_range,
 
     # Compute the empirical coverage
     emp_scores = []
-    for i in range(n_val):
-        # Random sampling of states and control iputs
-        x_val = np.zeros(n_dim)
-        for j in range(n_dim):
-            x_val[j] = np.random.uniform(x_range[j][0], x_range[j][1])
-        
-        u_val = np.zeros(n_control)
-        for j in range(n_control):
-            u_val[j] = np.random.uniform(u_range[j][0], u_range[j][1])
-        if n_control == 1:
-            u_val = u_val[0]
-
+    for i in range(num_samples_val):
         # x_dot by the true model
-        x_dot = dynamical_system(x_val, u_val)
+        x_dot = dynamical_system(x_val[i,:], u_val[i,0])
 
         # x_dot by the SINDy model
-        Theta = model.get_regressor(x_val.reshape(1,n_dim), u_val.reshape(1,n_control))
+        Theta = model.get_regressor(x_val[i,:].reshape(1,x_dim), u_val[i,0].reshape(1,u_dim))
         coeff = model.optimizer.coef_
         x_dot_sindy = Theta @ coeff.T
 

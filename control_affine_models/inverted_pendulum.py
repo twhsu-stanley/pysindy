@@ -17,27 +17,7 @@ from utils import *
 # Seed the random number generators for reproducibility
 #np.random.seed(100)
 
-# Set up simulation parameters
-time_horzn = 1.0
-dt = 0.01
-ang_ind = [0]
-
-# Initialize integrator keywords for solve_ivp to replicate the odeint defaults
-integrator_keywords = {}
-integrator_keywords["rtol"] = 1e-9
-integrator_keywords["method"] = "LSODA"
-integrator_keywords["atol"] = 1e-9
-
-# Randomized initial condition
-def x0_fun(): return [np.random.uniform(-np.pi, np.pi), np.random.uniform(-np.pi, np.pi)]
-
-def x0_zero(): return [0.0, 0.0]
-
-# Range of the amplitudes and frequencies of the randomized sine inputs
-u_amp_range = [0, 10]
-u_freq_range = [0, 5]
-
-# Model parameters {"M": 1.0, "m": 1.0, "L": 0.5, "Kd": 10.0}
+# System parameters
 m = 1 # pendulum mass
 L = 1 # length
 b = 0.01 # friction coeff
@@ -57,41 +37,52 @@ def ip(t, state, u_fun):
     u = u_fun(t)
     return ip_dyn(state, u)
 
-## Train a SINDYc model using trajectory data
-# Generate the training dataset
-t_data = np.arange(0, time_horzn, dt)
-t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 1000
-n_traj_zero = 100
+# Generate a dataset {x_dot_i , (x_i, u_i)}, i=1,...N
+num_samples = 100000 # size of the entire dataset
+num_samples_train = 90000 # size of training set
+num_samples_cal = 5000 # size of calibration set
+num_samples_val = 5000 # size of validation set
+assert num_samples_train + num_samples_cal + num_samples_val == num_samples
 
-x_train, x_dot_train, u_train = gen_trajectory_dataset(ip, x0_fun, n_traj_train, time_horzn, dt, 
-                                          u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
+theta_max = np.pi
+theta_dot_max = 6.0
+u_max = 5.0
+x_range = np.array([
+     [-theta_max, theta_max],
+     [-theta_dot_max, theta_dot_max]
+])
+u_range = np.array([
+     [-u_max, u_max]
+])
+x_samples = generate_samples(x_range, num_samples)
+u_samples = generate_samples(u_range, num_samples)
+x_dot_samples = np.zeros((num_samples, 2))
+for i in range(num_samples):
+    x_dot_samples[i,:] = ip_dyn(x_samples[i,:], u_samples[i,0])
 
-x_zero, x_dot_zero, u_zero = gen_trajectory_dataset(ip, x0_zero, n_traj_zero, time_horzn, dt, 
-                                          [0.0, 0.0], [0.0, 0.0], ang_ind, **integrator_keywords)
-
-x_train = [*x_train, *x_zero]
-x_dot_train = [*x_dot_train, *x_dot_zero]
-u_train = [*u_train, *u_zero]
-
-#plt.plot(t_data, x_train[0])
-#plt.show()
-#plt.plot(t_data, x_train[0][:,1], t_data, x_dot_train[0][:,0])
-#plt.show()
-#plt.plot(t_data, x_train[0][:,3], t_data, x_dot_train[0][:,2])
-#plt.show()
-#plt.plot(t_data, u_train[0])
-#plt.show()
+# Split the dataset into the training, calibration, and validation sets
+# Training set
+x_train = x_samples[:num_samples_train, :]
+u_train = u_samples[:num_samples_train, :]
+x_dot_train = x_dot_samples[:num_samples_train, :]
+# Calibration set
+x_cal = x_samples[num_samples_train:(num_samples_train+num_samples_cal), :]
+u_cal = u_samples[num_samples_train:(num_samples_train+num_samples_cal), :]
+x_dot_cal = x_dot_samples[num_samples_train:(num_samples_train+num_samples_cal), :]
+# Validation set
+x_val = x_samples[(num_samples_train+num_samples_cal):(num_samples_train+num_samples_cal+num_samples_val), :]
+u_val = u_samples[(num_samples_train+num_samples_cal):(num_samples_train+num_samples_cal+num_samples_val), :]
+x_dot_val = x_dot_samples[(num_samples_train+num_samples_cal):(num_samples_train+num_samples_cal+num_samples_val), :]
 
 # Instantiate and fit the SINDYc model
 # Generalized Library (such that it's control affine)
 generalized_library = ps.GeneralizedLibrary(
-    [ps.PolynomialLibrary(degree = 2),
+    [ps.PolynomialLibrary(degree = 4),
      #ps.FourierLibrary(n_frequencies = 1),
      #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.IdentityLibrary() # for control input
     ],
-    tensor_array = [[1,1]],
+    #tensor_array = [[1,1]],
     inputs_per_library = [[0,1], [2]]
 )
 
@@ -100,7 +91,7 @@ model_uc = ps.SINDy(
     optimizer = ps.STLSQ(threshold = 0.01),
     feature_library = generalized_library,
 )
-model_uc.fit(x_train, x_dot = x_dot_train, u = u_train, t = dt)
+model_uc.fit(x_train, x_dot = x_dot_train, u = u_train)
 model_uc.print()
 print("Feature names:\n", model_uc.get_feature_names())
 
@@ -109,52 +100,25 @@ model = model_uc
 control_affine = check_control_affine(model)
 assert control_affine is True
 
-model = set_derivative_coeff(model, [0], [1]) #x2 (resp. x3) is the time deriv of x0 (resp. x1)
+model = set_derivative_coeff(model, [0], [1]) #x1 is the time derivative of x0
 model.print()
 
-## Assess results on a test trajectory
-# Evolve the equations in time using a different initial condition
-x0 = x0_fun()
-u_amp_data = np.random.uniform(0, 100)
-u_freq_data = np.random.uniform(0, 5)
-u_fun = lambda t: u_amp_data * np.sin(2 * np.pi * u_freq_data * t)
-test_model_prediction(ip, model, x0, u_fun, time_horzn, dt, ang_ind, **integrator_keywords)
-
-x0 = x0_zero()
-u_zero = lambda t: 0.0 * t
-test_model_prediction(ip, model, x0, u_zero, time_horzn, dt, ang_ind, **integrator_keywords)
-
-## Compute conformal prediction quantile
-theta_max = np.pi/4
-theta_dot_max = 1.0
-x_norm = [theta_max, theta_dot_max]
-
-x_range = np.array([
-     [-theta_max, theta_max],
-     [-theta_dot_max, theta_dot_max]
-])
-
-u_range = np.array([
-     [-5.0, 5.0]
-])
-
+# Compute conformal prediction quantile using the calibration set and test it on the validation set
 alpha = 0.05
-n_cal = 1000
-n_val = 1000
 norm = 2
-
-quantile = get_conformal_prediction_quantile(ip_dyn, model, x_range, u_range,
-                                      n_cal, n_val, alpha, norm)
+quantile = get_conformal_prediction_quantile(ip_dyn, model, 
+                                             x_cal, u_cal, x_val, u_val,
+                                             alpha, norm = 2)
 
 # Save the quantile and alpha as paramters under the model
-model_error = {"alpha": alpha, "quantile": quantile, "norm": norm, "normalization": x_norm}
+model_error = {"alpha": alpha, "quantile": quantile, "norm": norm}
 
 model_saved = {"feature_names": model.get_feature_names(), "coefficients": model.optimizer.coef_, "model_error": model_error}
 
-## Save the model and dataset
+# Save the model and dataset
 with open('./control_affine_models/saved_models/model_inverted_pendulum_sindy', 'wb') as file:
     pickle.dump(model_saved, file)
- 
+
 # Testing
 with open('./control_affine_models/saved_models/' + 'model_inverted_pendulum_sindy', 'rb') as file:
 	model2 = pickle.load(file)
