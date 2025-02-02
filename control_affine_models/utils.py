@@ -223,8 +223,8 @@ def test_conformal_prediction(dynamical_system, model,
 
     return quantile
 
-def get_conformal_prediction_quantile(dynamical_system, model, 
-                                      x_cal, u_cal, x_val, u_val,
+def get_conformal_prediction_quantile(model,
+                                      x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
                                       alpha = 0.05, norm = 2,
                                       normalization = None):
     """Get conformal prediction quantile using randomly sampled data"""
@@ -246,9 +246,6 @@ def get_conformal_prediction_quantile(dynamical_system, model,
     # Compute non-conformity scores
     nc_score = []
     for i in range(num_samples_cal):
-        # x_dot by the true model
-        x_dot = dynamical_system(x_cal[i,:], u_cal[i,0])
-
         # x_dot by the SINDy model
         Theta = model.get_regressor(x_cal[i,:].reshape(1,x_dim), u_cal[i,0].reshape(1,u_dim))
         coeff = model.optimizer.coef_
@@ -256,9 +253,9 @@ def get_conformal_prediction_quantile(dynamical_system, model,
 
         # Compute modeling error (non-conformity score)
         if normalization is not None:
-            R = np.linalg.norm(Tx_inv @ (x_dot_sindy[0][:] - x_dot), norm)
+            R = np.linalg.norm(Tx_inv @ (x_dot_sindy[0][:] - x_dot_cal[i,:]), norm)
         else:
-            R = np.linalg.norm(x_dot_sindy[0][:] - x_dot, norm)
+            R = np.linalg.norm(x_dot_sindy[0][:] - x_dot_cal[i,:], norm)
         nc_score.append(R)
 
     # Compute the quantile
@@ -269,9 +266,6 @@ def get_conformal_prediction_quantile(dynamical_system, model,
     # Compute the empirical coverage
     emp_scores = []
     for i in range(num_samples_val):
-        # x_dot by the true model
-        x_dot = dynamical_system(x_val[i,:], u_val[i,0])
-
         # x_dot by the SINDy model
         Theta = model.get_regressor(x_val[i,:].reshape(1,x_dim), u_val[i,0].reshape(1,u_dim))
         coeff = model.optimizer.coef_
@@ -279,9 +273,9 @@ def get_conformal_prediction_quantile(dynamical_system, model,
 
         # Compute modeling error (non-conformity score)
         if normalization is not None:
-            R = np.linalg.norm(Tx_inv @ (x_dot_sindy[0][:] - x_dot), norm)
+            R = np.linalg.norm(Tx_inv @ (x_dot_sindy[0][:] - x_dot_val[i,:]), norm)
         else:
-            R = np.linalg.norm(x_dot_sindy[0][:] - x_dot, norm)
+            R = np.linalg.norm(x_dot_sindy[0][:] - x_dot_val[i,:], norm)
         emp_scores.append(R)
 
     emp_coverage = sum(k < quantile for k in emp_scores) / len(emp_scores)

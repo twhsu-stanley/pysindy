@@ -17,24 +17,6 @@ from utils import *
 # Seed the random number generators for reproducibility
 #np.random.seed(100)
 
-# Set up simulation parameters
-time_horzn = 1.0
-dt = 0.01
-ang_ind = [1]
-
-# Initialize integrator keywords for solve_ivp to replicate the odeint defaults
-integrator_keywords = {}
-integrator_keywords["rtol"] = 1e-9
-integrator_keywords["method"] = "LSODA"
-integrator_keywords["atol"] = 1e-9
-
-# Randomized initial condition
-def x0_fun(): return [0.0, np.random.uniform(-10, 10), 
-                      np.random.uniform(-np.pi/2, np.pi/2), np.random.uniform(-np.pi*2, np.pi*2)]
-
-def x0_zero(): return [0.0, 0.0, 0.0, 0.0]
-
-
 # Model parameters {"M": 1.0, "m": 1.0, "L": 0.5, "Kd": 10.0}
 m = 0.3 # pendulum mass
 M = 1 # cart mass
@@ -70,9 +52,9 @@ assert num_samples_train + num_samples_cal + num_samples_val == num_samples
 
 z_max = 10.0
 theta_max = np.pi
-v_max = 30.0
-omega_max = np.pi * 3
-u_max = 60.0
+v_max = 40.0
+omega_max = np.pi * 4
+u_max = 80.0
 x_range = np.array([
      [-z_max, z_max],
      [-theta_max, theta_max],
@@ -101,28 +83,6 @@ x_dot_cal = x_dot_samples[num_samples_train:(num_samples_train+num_samples_cal),
 x_val = x_samples[(num_samples_train+num_samples_cal):(num_samples_train+num_samples_cal+num_samples_val), :]
 u_val = u_samples[(num_samples_train+num_samples_cal):(num_samples_train+num_samples_cal+num_samples_val), :]
 x_dot_val = x_dot_samples[(num_samples_train+num_samples_cal):(num_samples_train+num_samples_cal+num_samples_val), :]
-
-###########################################################################################################
-# Generate the training dataset
-"""
-t_data = np.arange(0, time_horzn, dt)
-t_data_span = (t_data[0], t_data[-1])
-n_traj_train = 1000
-n_traj_zero = 100
-u_amp_range = [0, 100]
-u_freq_range = [0, 5]
-
-x_train, x_dot_train, u_train = gen_trajectory_dataset(cartpole, x0_fun, n_traj_train, time_horzn, dt, 
-                                          u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
-
-x_zero, x_dot_zero, u_zero = gen_trajectory_dataset(cartpole, x0_zero, n_traj_zero, time_horzn, dt, 
-                                          [0.0, 0.0], [0.0, 0.0], ang_ind, **integrator_keywords)
-
-x_train = [*x_train, *x_zero]
-x_dot_train = [*x_dot_train, *x_dot_zero]
-u_train = [*u_train, *u_zero]
-"""
-###########################################################################################################
 
 # Instantiate and fit the SINDYc model
 # Generalized Library (such that it's control affine)
@@ -169,13 +129,19 @@ assert control_affine is True
 model = set_derivative_coeff(model, [0,1], [2,3]) #x2 (resp. x3) is the time deriv of x0 (resp. x1)
 model.print()
 
-#  Assess results on a test trajectory #####################################################################
-x0 = x0_fun()
-u_amp_data = np.random.uniform(0, 10)
+#  Assess results on a test trajectory
+time_horzn = 1.0
+dt = 0.01
+ang_ind = [1]
+integrator_keywords = {}
+integrator_keywords["rtol"] = 1e-9
+integrator_keywords["method"] = "LSODA"
+integrator_keywords["atol"] = 1e-9
+x0 = [0.0, 0.0, 0.0, 0.0]
+u_amp_data = np.random.uniform(0, 100)
 u_freq_data = np.random.uniform(0, 5)
 u_fun = lambda t: u_amp_data * np.sin(2 * np.pi * u_freq_data * t)
 test_model_prediction(cartpole, model, x0, u_fun, time_horzn, dt, ang_ind, **integrator_keywords)
-###########################################################################################################
 
 # Compute conformal prediction quantile
 alpha = 0.05
@@ -187,8 +153,8 @@ theta_max = np.pi/6
 v_max = 1.5
 omega_max = 1.0
 x_norm = [z_max, theta_max, v_max, omega_max]
-quantile = get_conformal_prediction_quantile(cartpole_dyn, model, 
-                                             x_cal, u_cal, x_val, u_val,
+quantile = get_conformal_prediction_quantile(model,
+                                             x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
                                              alpha, norm = 2, normalization = x_norm)
 
 # Save the quantile and alpha as paramters under the model
@@ -197,9 +163,9 @@ model_error = {"alpha": alpha, "quantile": quantile, "norm": norm, "normalizatio
 model_saved = {"feature_names": model.get_feature_names(), "coefficients": model.optimizer.coef_, "model_error": model_error}
 
 # Save the model and dataset
-with open('./control_affine_models/saved_models/model_cartpole_sindy_coarse_2', 'wb') as file:
+with open('./control_affine_models/saved_models/model_cartpole_sindy', 'wb') as file:
     pickle.dump(model_saved, file)
  
 # Testing
-with open('./control_affine_models/saved_models/' + 'model_cartpole_sindy_coarse_2', 'rb') as file:
+with open('./control_affine_models/saved_models/' + 'model_cartpole_sindy', 'rb') as file:
 	model2 = pickle.load(file)

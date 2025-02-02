@@ -106,8 +106,8 @@ model.print()
 # Compute conformal prediction quantile using the calibration set and test it on the validation set
 alpha = 0.05
 norm = 2
-quantile = get_conformal_prediction_quantile(ip_dyn, model, 
-                                             x_cal, u_cal, x_val, u_val,
+quantile = get_conformal_prediction_quantile(model,
+                                             x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
                                              alpha, norm = 2)
 
 # Save the quantile and alpha as paramters under the model
