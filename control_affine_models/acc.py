@@ -56,7 +56,7 @@ x_range = np.array([
      [-z_max, z_max]
 ])
 u_range = np.array([
-     [-5000, 5000]
+     [-10000, 10000]
 ])
 x_samples = generate_samples(x_range, num_samples)
 u_samples = generate_samples(u_range, num_samples)
@@ -103,7 +103,7 @@ control_affine = check_control_affine(model)
 assert control_affine is True
 
 # Compute conformal prediction quantile
-alpha = 0.05
+alpha = 0.1
 norm = 2
 quantile = get_conformal_prediction_quantile(model,
                                              x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
