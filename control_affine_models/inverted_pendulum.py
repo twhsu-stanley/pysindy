@@ -78,11 +78,9 @@ x_dot_val = x_dot_samples[(num_samples_train+num_samples_cal):(num_samples_train
 # Generalized Library (such that it's control affine)
 generalized_library = ps.GeneralizedLibrary(
     [ps.PolynomialLibrary(degree = 4),
-     #ps.FourierLibrary(n_frequencies = 1),
-     #ps.FourierLibrary(n_frequencies = 1) * ps.FourierLibrary(n_frequencies = 1),
      ps.IdentityLibrary() # for control input
     ],
-    #tensor_array = [[1,1]],
+    tensor_array = [[1,1]],
     inputs_per_library = [[0,1], [2]]
 )
 
@@ -104,7 +102,7 @@ model = set_derivative_coeff(model, [0], [1]) #x1 is the time derivative of x0
 model.print()
 
 # Compute conformal prediction quantile using the calibration set and test it on the validation set
-alpha = 0.05
+alpha = 0.1
 norm = 2
 quantile = get_conformal_prediction_quantile(model,
                                              x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
