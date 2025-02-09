@@ -19,46 +19,50 @@ from utils import *
 #np.random.seed(100)
 
 # System parameter
-v = 1.0
+v0 = 15
+m  = 2000
+f0 = 0.5
+f1 = 5.0
+f2 = 1.0
 
-def dubins_car_dyn(state, u):
+def acc_dyn(state, u):
     # x_dot = f(x, u)
 
-    x_, y_, theta_ = state
+    p, v, z = state
 
-    x_dot = v * np.cos(theta_)
-    y_dot = v * np.sin(theta_)
-    theta_dot = u
+    p_dot = v
+    v_dot = -(f0 + f1 * v + f2 * v**2) / m + u / m
+    z_dot = v0 - v
     
-    return [x_dot, y_dot, theta_dot]
+    return [p_dot, v_dot, z_dot]
 
-def dubins_car(t, state, u_fun):
+def acc(t, state, u_fun):
     u = u_fun(t)
-    return dubins_car_dyn(state, u)
+    return acc_dyn(state, u)
 
 # Generate a dataset {x_dot_i , (x_i, u_i)}, i=1,...N
-num_samples = 100000 # size of the entire dataset
-num_samples_train = 90000 # size of training set
-num_samples_cal = 5000 # size of calibration set
-num_samples_val = 5000 # size of validation set
+num_samples = 2000 # size of the entire dataset
+num_samples_train = 200 # size of training set
+num_samples_cal = 900 # size of calibration set
+num_samples_val = 900 # size of validation set
 assert num_samples_train + num_samples_cal + num_samples_val == num_samples
 
-x_max = 10.0
-y_max = 10.0
-theta_max = np.pi
+p_max = 100.0
+v_max = 50.0
+z_max = 20.0
 x_range = np.array([
-     [-x_max, x_max],
-     [-y_max, y_max],
-     [-theta_max, theta_max]
+     [-p_max, p_max],
+     [-v_max, v_max],
+     [-z_max, z_max]
 ])
 u_range = np.array([
-     [-np.pi, np.pi]
+     [-5000, 5000]
 ])
 x_samples = generate_samples(x_range, num_samples)
 u_samples = generate_samples(u_range, num_samples)
 x_dot_samples = np.zeros((num_samples, 3))
 for i in range(num_samples):
-    x_dot_samples[i,:] = dubins_car_dyn(x_samples[i,:], u_samples[i,0])
+    x_dot_samples[i,:] = acc_dyn(x_samples[i,:], u_samples[i,0])
 
 # Split the dataset into the training, calibration, and validation sets
 # Training set
@@ -77,12 +81,11 @@ x_dot_val = x_dot_samples[(num_samples_train+num_samples_cal):(num_samples_train
 # Instantiate and fit the SINDYc model
 # Generalized Library (such that it's control affine)
 generalized_library = ps.GeneralizedLibrary(
-    [ps.PolynomialLibrary(degree = 3),
+    [ps.PolynomialLibrary(degree = 1),
      ps.IdentityLibrary() # for control input
     ],
-    #tensor_array = [[1,1]],
-    #inputs_per_library = [[0,1,2], [3]]
-    inputs_per_library = [[2], [3]]
+    tensor_array = [[1,1]],
+    inputs_per_library = [[0,1,2], [3]]
 )
 
 # Unconstrained model
@@ -112,9 +115,9 @@ model_error = {"alpha": alpha, "quantile": quantile, "norm": norm}
 model_saved = {"feature_names": model.get_feature_names(), "coefficients": model.optimizer.coef_, "model_error": model_error}
 
 # Save the model and dataset
-with open('./control_affine_models/saved_models/model_dubins_car_sindy', 'wb') as file:
+with open('./control_affine_models/saved_models/model_acc_sindy', 'wb') as file:
     dill.dump(model_saved, file)
  
 # Testing
-with open('./control_affine_models/saved_models/' + 'model_dubins_car_sindy', 'rb') as file:
+with open('./control_affine_models/saved_models/' + 'model_acc_sindy', 'rb') as file:
 	model2 = dill.load(file)
