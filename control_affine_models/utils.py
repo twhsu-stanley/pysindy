@@ -247,7 +247,7 @@ def get_conformal_prediction_quantile(model,
     nc_score = []
     for i in range(num_samples_cal):
         # x_dot by the SINDy model
-        Theta = model.get_regressor(x_cal[i,:].reshape(1,x_dim), u_cal[i,0].reshape(1,u_dim))
+        Theta = model.get_regressor(x_cal[i,:].reshape(1,x_dim), u_cal[i,:].reshape(1,u_dim))
         coeff = model.optimizer.coef_
         x_dot_sindy = Theta @ coeff.T
 
@@ -267,7 +267,7 @@ def get_conformal_prediction_quantile(model,
     emp_scores = []
     for i in range(num_samples_val):
         # x_dot by the SINDy model
-        Theta = model.get_regressor(x_val[i,:].reshape(1,x_dim), u_val[i,0].reshape(1,u_dim))
+        Theta = model.get_regressor(x_val[i,:].reshape(1,x_dim), u_val[i,:].reshape(1,u_dim))
         coeff = model.optimizer.coef_
         x_dot_sindy = Theta @ coeff.T
 
