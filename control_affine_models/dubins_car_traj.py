@@ -153,9 +153,9 @@ model_error = {"alpha": alpha, "quantile": quantile, "norm": norm}
 model_saved = {"feature_names": model.get_feature_names(), "coefficients": model.optimizer.coef_, "model_error": model_error}
 
 # Save the model and dataset
-with open('./control_affine_models/saved_models/model_acc_traj_sindy', 'wb') as file:
+with open('./control_affine_models/saved_models/model_dubins_car_traj_sindy', 'wb') as file:
     pickle.dump(model_saved, file)
 
 # Testing
-with open('./control_affine_models/saved_models/' + 'model_acc_traj_sindy', 'rb') as file:
+with open('./control_affine_models/saved_models/' + 'model_dubins_car_traj_sindy', 'rb') as file:
 	model2 = pickle.load(file)
