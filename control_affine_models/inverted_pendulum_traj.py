@@ -20,6 +20,7 @@ from utils import *
 # Set up simulation parameters
 time_horzn = 5.0
 dt = 0.01
+time_steps = int(np.ceil(time_horzn/dt))
 ang_ind = [0]
 u_max = 5.0
 u_fun = lambda t: u_max * np.sin(2 * np.pi * 1.0 * t)
@@ -66,9 +67,9 @@ x_range = np.array([
 
 # Generate random initial states
 x0_traj = generate_samples(x_range, num_traj)
-x_traj = np.zeros((num_traj, int(np.ceil(time_horzn/dt)), 2))
-u_traj = np.zeros((num_traj, int(np.ceil(time_horzn/dt)), 1))
-x_dot_traj = np.zeros((num_traj, int(np.ceil(time_horzn/dt)), 2))
+x_traj = np.zeros((num_traj, time_steps, 2))
+u_traj = np.zeros((num_traj, time_steps, 1))
+x_dot_traj = np.zeros((num_traj, time_steps, 2))
 for i in range(num_traj):
     x0 = x0_traj[i,:]
     x_temp, x_dot_temp, u_temp = gen_single_trajectory(ip, x0, u_fun, time_horzn, dt, ang_ind, **integrator_keywords)
@@ -77,29 +78,30 @@ for i in range(num_traj):
     x_dot_traj[i,:,:] = x_dot_temp
 
 # Split the dataset into the training, calibration, and validation sets
+# NOTE: Discard the first and last time sample because x_dots by np.gradient are not accurate
 # Training set
-x_train = x_traj[:num_traj_train, :, :]
-u_train = u_traj[:num_traj_train, :, :]
-x_dot_train = x_dot_traj[:num_traj_train, :, :]
+x_train = x_traj[:num_traj_train, 1:-1, :]
+u_train = u_traj[:num_traj_train, 1:-1, :]
+x_dot_train = x_dot_traj[:num_traj_train, 1:-1, :]
 # reshape the training data for training
 x_train = x_train.reshape(-1, x_train.shape[-1])
 u_train = u_train.reshape(-1, u_train.shape[-1])
 x_dot_train = x_dot_train.reshape(-1, x_dot_train.shape[-1])
 
 # Calibration set
-x_cal = x_traj[num_traj_train:(num_traj_train+num_traj_cal), :, :]
-u_cal = u_traj[num_traj_train:(num_traj_train+num_traj_cal), :, :]
-x_dot_cal = x_dot_traj[num_traj_train:(num_traj_train+num_traj_cal), :, :]
+x_cal = x_traj[num_traj_train:(num_traj_train+num_traj_cal), 1:-1, :]
+u_cal = u_traj[num_traj_train:(num_traj_train+num_traj_cal), 1:-1, :]
+x_dot_cal = x_dot_traj[num_traj_train:(num_traj_train+num_traj_cal), 1:-1, :]
 
 # Validation set
-x_val = x_traj[(num_traj_train+num_traj_cal):(num_traj_train+num_traj_cal+num_traj_val), :, :]
-u_val = u_traj[(num_traj_train+num_traj_cal):(num_traj_train+num_traj_cal+num_traj_val), :, :]
-x_dot_val = x_dot_traj[(num_traj_train+num_traj_cal):(num_traj_train+num_traj_cal+num_traj_val), :, :]
+x_val = x_traj[(num_traj_train+num_traj_cal):(num_traj_train+num_traj_cal+num_traj_val), 1:-1, :]
+u_val = u_traj[(num_traj_train+num_traj_cal):(num_traj_train+num_traj_cal+num_traj_val), 1:-1, :]
+x_dot_val = x_dot_traj[(num_traj_train+num_traj_cal):(num_traj_train+num_traj_cal+num_traj_val), 1:-1, :]
 
 # Instantiate and fit the SINDYc model
 # Generalized Library (such that it's control affine)
 generalized_library = ps.GeneralizedLibrary(
-    [ps.PolynomialLibrary(degree = 5),
+    [ps.PolynomialLibrary(degree = 4),
      ps.IdentityLibrary() # for control input
     ],
     tensor_array = [[1,1]],
@@ -123,8 +125,8 @@ model = model_uc
 model = set_derivative_coeff(model, [0], [1]) #x1 is the time derivative of x0
 model.print()
 
-#x0 = [0.0, 0.0]
-#test_model_prediction(ip, model, x0, u_fun, time_horzn, dt, ang_ind, **integrator_keywords)
+x0 = [0.0, 0.0]
+test_model_prediction(ip, model, x0, u_fun, time_horzn, dt, ang_ind, **integrator_keywords)
 
 # Compute conformal quantile using the calibration set and test it on the validation set
 alpha = 0.1

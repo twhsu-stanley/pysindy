@@ -2,7 +2,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 import pysindy as ps
 import matplotlib
-#matplotlib.use('TkAgg')  # Or 'Qt5Agg' if you installed PyQt5
+matplotlib.use('TkAgg')  # Or 'Qt5Agg' if you installed PyQt5
 import matplotlib.pyplot as plt
 
 def wrapToPi(ang):
@@ -159,7 +159,7 @@ def get_conformal_quantile(model,
         Tx_inv = np.diag(norm_inv)
 
     # Compute non-conformity scores
-    nc_score = []
+    nc_scores = []
     for i in range(num_samples_cal):
         # x_dot by the SINDy model
         Theta = model.get_regressor(x_cal[i,:].reshape(1,x_dim), u_cal[i,:].reshape(1,u_dim))
@@ -171,11 +171,11 @@ def get_conformal_quantile(model,
             R = np.linalg.norm(Tx_inv @ (x_dot_sindy[0][:] - x_dot_cal[i,:]), norm)
         else:
             R = np.linalg.norm(x_dot_sindy[0][:] - x_dot_cal[i,:], norm)
-        nc_score.append(R)
+        nc_scores.append(R)
 
     # Compute the quantile
-    n = len(nc_score)
-    quantile = np.quantile(nc_score, np.ceil((n + 1) * (1 - alpha)) / n, interpolation="higher")
+    n = len(nc_scores)
+    quantile = np.quantile(nc_scores, np.ceil((n + 1) * (1 - alpha)) / n, interpolation="higher")
     print("Quantile for alpha = %5.3f is %5.3f" % (alpha, quantile))
 
     # Compute the empirical coverage
@@ -223,27 +223,29 @@ def get_conformal_traj_quantile(model,
         Tx_inv = np.diag(norm_inv)
 
     # Compute non-conformity scores
-    nc_score = np.zeros(num_traj_cal)
+    nc_scores = np.zeros(num_traj_cal)
     for i in range(num_traj_cal):
+        traj_scores = np.zeros(time_steps)
         for t in range(time_steps):
             # x_dot by the SINDy model
-            Theta = model.get_regressor(x_cal[i,t,:].reshape(1,x_dim), u_cal[i,t,:].reshape(1,u_dim))
-            coeff = model.optimizer.coef_
-            x_dot_sindy = Theta @ coeff.T
+            #Theta = model.get_regressor(x_cal[i,t,:].reshape(1,x_dim), u_cal[i,t,:].reshape(1,u_dim))
+            #coeff = model.optimizer.coef_
+            #x_dot_sindy = Theta @ coeff.T
+            x_dot_sindy = model.predict(x_cal[i,t,:].reshape(1,x_dim), u = u_cal[i,t,:].reshape(1,u_dim))
 
             # Compute modeling error of each time step
             if normalization is not None:
                 R = np.linalg.norm(Tx_inv @ (x_dot_sindy[0][:] - x_dot_cal[i,t,:]), norm)
             else:
                 R = np.linalg.norm(x_dot_sindy[0][:] - x_dot_cal[i,t,:], norm)
-
-            # Compute the sup over all time steps
-            if R > nc_score[i]:
-                nc_score[i] = R
+            traj_scores[t] = R
+            
+        # Compute the sup over all time steps
+        nc_scores[i] = np.max(traj_scores)
 
     # Compute the quantile
     n = num_traj_cal
-    quantile = np.quantile(nc_score, np.ceil((n + 1) * (1 - alpha)) / n, interpolation="higher")
+    quantile = np.quantile(nc_scores, np.ceil((n + 1) * (1 - alpha)) / n, interpolation="higher")
     print("Quantile for alpha = %5.3f is %5.3f" % (alpha, quantile))
 
     # Compute the empirical coverage
@@ -251,9 +253,10 @@ def get_conformal_traj_quantile(model,
     for i in range(num_traj_val):
         for t in range(time_steps):
             # x_dot by the SINDy model
-            Theta = model.get_regressor(x_val[i,t,:].reshape(1,x_dim), u_val[i,t,:].reshape(1,u_dim))
-            coeff = model.optimizer.coef_
-            x_dot_sindy = Theta @ coeff.T
+            #Theta = model.get_regressor(x_val[i,t,:].reshape(1,x_dim), u_val[i,t,:].reshape(1,u_dim))
+            #coeff = model.optimizer.coef_
+            #x_dot_sindy = Theta @ coeff.T
+            x_dot_sindy = model.predict(x_val[i,t,:].reshape(1,x_dim), u = u_val[i,t,:].reshape(1,u_dim))
 
             # Compute modeling error (non-conformity score)
             if normalization is not None:
