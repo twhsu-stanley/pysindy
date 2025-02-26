@@ -101,7 +101,7 @@ x_dot_val = x_dot_traj[(num_traj_train+num_traj_cal):(num_traj_train+num_traj_ca
 # Instantiate and fit the SINDYc model
 # Generalized Library (such that it's control affine)
 generalized_library = ps.GeneralizedLibrary(
-    [ps.PolynomialLibrary(degree = 4),
+    [ps.PolynomialLibrary(degree = 5),
      ps.IdentityLibrary() # for control input
     ],
     tensor_array = [[1,1]],
