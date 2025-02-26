@@ -153,7 +153,7 @@ theta_max = np.pi/6
 v_max = 1.5
 omega_max = 1.0
 x_norm = [z_max, theta_max, v_max, omega_max]
-quantile = get_conformal_prediction_quantile(model,
+quantile = get_conformal_quantile(model,
                                              x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
                                              alpha, norm = 2, normalization = x_norm)
 

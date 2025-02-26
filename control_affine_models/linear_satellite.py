@@ -123,7 +123,7 @@ model = model_uc
 # Compute conformal prediction quantile
 alpha = 0.05
 norm = 2
-quantile = get_conformal_prediction_quantile(model,
+quantile = get_conformal_quantile(model,
                                              x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
                                              alpha, norm = 2)
 

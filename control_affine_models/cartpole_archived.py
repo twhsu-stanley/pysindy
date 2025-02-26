@@ -185,7 +185,7 @@ n_cal = 1000
 n_val = 1000
 norm = 2
 
-quantile = get_conformal_prediction_quantile(cartpole_dyn, model, x_range, u_range,
+quantile = get_conformal_quantile(cartpole_dyn, model, x_range, u_range,
                                       n_cal, n_val, alpha, norm,
                                       normalization = x_norm)
 

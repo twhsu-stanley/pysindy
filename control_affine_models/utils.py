@@ -20,52 +20,6 @@ def generate_samples(data_range, num_samples):
                                 size = (num_samples, data_dim))
     return samples
 
-def gen_trajectory_dataset(dynamical_system, x0_fun, n_traj, time_horzn, dt, u_amp_range, u_freq_range, ang_ind = [], **integrator_keywords):
-    """Generate a dataset of trajectories"""
-    # dynamical_system: dynamical system
-    # x0: function that generates radom initial conditions
-    # u_amp_range: [u_amp min, u_amp max]
-    # u_freq_range: [u_freq min, u_freq max]
-    # ang_ind: indices of state variables that are angles (need to be wrapped to [0, 2*pi))
-
-    time = np.arange(0, time_horzn, dt)
-    time_span = (time[0], time[-1])
-
-    x_data = []
-    x_dot_data = []
-    u_data = []
-
-    for i in range(n_traj):
-        # Random initial state distribution
-        x0 = x0_fun()
-
-        # Sinusoidal inputs with random amplitudes and frequencies
-        u_amp = np.random.uniform(u_amp_range[0], u_amp_range[1])
-        u_freq = np.random.uniform(u_freq_range[0], u_freq_range[1])
-        u_fun = lambda t: u_amp * np.sin(2 * np.pi * u_freq * t)
-
-        # Simulate the trajectory
-        x_traj = solve_ivp(
-            dynamical_system,
-            time_span,
-            x0,
-            t_eval = time,
-            args = (u_fun,),
-            **integrator_keywords,
-        ).y.T
-
-        x_dot_traj = np.gradient(x_traj, dt, axis = 0)
-
-        if len(ang_ind) > 0:
-            for i in ang_ind:
-                x_traj[:,i] = wrapToPi(x_traj[:,i])
-
-        x_data.append(x_traj)
-        x_dot_data.append(x_dot_traj)
-        u_data.append(u_fun(time))
-
-    return x_data, x_dot_data, u_data
-
 def gen_single_trajectory(dynamical_system, x0, u_fun, time_horzn, dt, ang_ind = [], **integrator_keywords):
     """Generate a single trajectory"""
     # dynamical_system: dynamical system
@@ -184,49 +138,10 @@ def set_derivative_coeff(model, idx, idx_d):
 
     return model
 
-def test_conformal_prediction(dynamical_system, model,
-                              x0_fun, time_horzn, dt, u_amp_range, u_freq_range,
-                              ang_ind = [], n_traj_cal = 100, n_traj_val = 100, alpha = 0.05,
-                              norm = 1,
-                              **integrator_keywords):
-    """Test run of conformal prediction on the modeling error"""
-
-    # Generate the calibration dataset
-    x_cal, x_dot_cal, u_cal = gen_trajectory_dataset(dynamical_system, x0_fun, n_traj_cal, time_horzn, dt,
-                                        u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
-    # Generate the validation dataset
-    x_val, x_dot_val, u_val = gen_trajectory_dataset(dynamical_system, x0_fun, n_traj_val, time_horzn, dt,
-                                        u_amp_range, u_freq_range, ang_ind, **integrator_keywords)
-
-    # Compute non-conformity scores
-    nc_score = []
-    for i in range(n_traj_cal):
-        #err = (model.predict(x_cal[i], u = u_cal[i]) - model.differentiate(x_cal[i], t = dt))
-        err = (model.predict(x_cal[i], u = u_cal[i]) - x_dot_cal[i])
-        R = np.linalg.norm(err, norm, axis = 1)
-        nc_score.extend(R)
-
-    # Compute the quantile
-    n = len(nc_score)
-    quantile = np.quantile(nc_score, np.ceil((n + 1) * (1 - alpha)) / n, interpolation="higher")
-    print("Quantile for alpha = %5.3f is %5.3f" % (alpha, quantile))
-
-    # Compute the empirical coverage
-    emp_scores = []
-    for i in range(n_traj_val):
-        #err = (model.predict(x_val[i], u = u_val[i]) - model.differentiate(x_val[i], t = dt))
-        err = (model.predict(x_val[i], u = u_val[i]) - x_dot_val[i])
-        R = np.linalg.norm(err, norm, axis = 1)
-        emp_scores.extend(R)
-    emp_coverage = sum(i < quantile for i in emp_scores) / len(emp_scores)
-    print("Empirical Coverage = %5.3f vs. 1-alpha = %5.3f" % (emp_coverage, 1- alpha))
-
-    return quantile
-
-def get_conformal_prediction_quantile(model,
-                                      x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
-                                      alpha = 0.05, norm = 2,
-                                      normalization = None):
+def get_conformal_quantile(model,
+                           x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
+                           alpha = 0.05, norm = 2,
+                           normalization = None):
     """Get conformal prediction quantile using randomly sampled data"""
     # dynamical_system: true model
     # model: SINDy model
@@ -279,6 +194,78 @@ def get_conformal_prediction_quantile(model,
         emp_scores.append(R)
 
     emp_coverage = sum(k < quantile for k in emp_scores) / len(emp_scores)
+    print("Empirical Coverage = %5.3f vs. 1-alpha = %5.3f" % (emp_coverage, 1- alpha))
+
+    return quantile
+
+def get_conformal_traj_quantile(model,
+                                x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
+                                alpha = 0.05, norm = 2,
+                                normalization = None):
+    """Get conformal prediction quantile using randomly sampled data"""
+    # dynamical_system: true model
+    # model: SINDy model
+
+    x_dim = x_cal.shape[2]
+    u_dim = u_cal.shape[2]
+    assert x_dim == x_val.shape[2]
+    assert u_dim == u_val.shape[2]
+
+    num_traj_cal = x_cal.shape[0]
+    num_traj_val = x_val.shape[0]
+
+    time_steps = x_cal.shape[1]
+    assert time_steps == u_cal.shape[1]
+    assert time_steps == x_dot_cal.shape[1]
+
+    if normalization is not None:
+        norm_inv = [norm ** -1 for norm in normalization]
+        Tx_inv = np.diag(norm_inv)
+
+    # Compute non-conformity scores
+    nc_score = np.zeros(num_traj_cal)
+    for i in range(num_traj_cal):
+        for t in range(time_steps):
+            # x_dot by the SINDy model
+            Theta = model.get_regressor(x_cal[i,t,:].reshape(1,x_dim), u_cal[i,t,:].reshape(1,u_dim))
+            coeff = model.optimizer.coef_
+            x_dot_sindy = Theta @ coeff.T
+
+            # Compute modeling error of each time step
+            if normalization is not None:
+                R = np.linalg.norm(Tx_inv @ (x_dot_sindy[0][:] - x_dot_cal[i,t,:]), norm)
+            else:
+                R = np.linalg.norm(x_dot_sindy[0][:] - x_dot_cal[i,t,:], norm)
+
+            # Compute the sup over all time steps
+            if R > nc_score[i]:
+                nc_score[i] = R
+
+    # Compute the quantile
+    n = num_traj_cal
+    quantile = np.quantile(nc_score, np.ceil((n + 1) * (1 - alpha)) / n, interpolation="higher")
+    print("Quantile for alpha = %5.3f is %5.3f" % (alpha, quantile))
+
+    # Compute the empirical coverage
+    emp_score = np.zeros(num_traj_val)
+    for i in range(num_traj_val):
+        for t in range(time_steps):
+            # x_dot by the SINDy model
+            Theta = model.get_regressor(x_val[i,t,:].reshape(1,x_dim), u_val[i,t,:].reshape(1,u_dim))
+            coeff = model.optimizer.coef_
+            x_dot_sindy = Theta @ coeff.T
+
+            # Compute modeling error (non-conformity score)
+            if normalization is not None:
+                R = np.linalg.norm(Tx_inv @ (x_dot_sindy[0][:] - x_dot_val[i,t,:]), norm)
+            else:
+                R = np.linalg.norm(x_dot_sindy[0][:] - x_dot_val[i,t,:], norm)
+
+            # Compute the sup over all time steps
+            if R > emp_score[i]:
+                emp_score[i] = R
+
+    emp_coverage = sum(k < quantile for k in emp_score) / len(emp_score)
     print("Empirical Coverage = %5.3f vs. 1-alpha = %5.3f" % (emp_coverage, 1- alpha))
 
     return quantile
