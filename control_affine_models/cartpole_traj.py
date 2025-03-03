@@ -22,7 +22,7 @@ time_horzn = 5.0
 dt = 0.01
 time_steps = int(np.ceil(time_horzn/dt))
 ang_ind = [1]
-u_max = 10.0
+u_max = 80.0 #10.0
 u_fun = lambda t: u_max * np.sin(2 * np.pi * 1 * t)
 
 # Initialize integrator keywords for solve_ivp to replicate the odeint defaults
@@ -66,10 +66,14 @@ assert num_traj_train + num_traj_cal + num_traj_val == num_traj
 
 # These maxima below are used for normalization (Tx_inv)
 # Thus, they must be consistent with the maxima used in the neural CLF code
-z_max = 1.0
-theta_max = np.pi/6
-v_max = 1.5
-omega_max = 1.0
+#z_max = 1.0
+#theta_max = np.pi/6
+#v_max = 1.5
+#omega_max = 1.0
+z_max = 10.0
+theta_max = np.pi
+v_max = 40.0
+omega_max = np.pi * 4
 x_range = np.array([
      [-z_max, z_max],
      [-theta_max, theta_max],
@@ -147,6 +151,12 @@ test_model_prediction(cartpole, model, x0, u_fun, time_horzn, dt, ang_ind, **int
 # Compute conformal prediction quantile
 alpha = 0.05
 norm = 2
+# These maxima below are used for normalization (Tx_inv)
+# Thus, they must be consistent with the maxima used in the neural CLF code
+z_max = 1.0
+theta_max = np.pi/6
+v_max = 1.5
+omega_max = 1.0
 x_norm = [z_max, theta_max, v_max, omega_max]
 quantile = get_conformal_traj_quantile(model,
                                        x_cal, u_cal, x_dot_cal, x_val, u_val, x_dot_val,
@@ -158,9 +168,9 @@ model_error = {"alpha": alpha, "quantile": quantile, "norm": norm}
 model_saved = {"feature_names": model.get_feature_names(), "coefficients": model.optimizer.coef_, "model_error": model_error}
 
 # Save the model and dataset
-with open('./control_affine_models/saved_models/model_cartpole_traj_sindy', 'wb') as file:
+with open('./control_affine_models/saved_models/model_cartpole_traj_big_sindy', 'wb') as file:
     pickle.dump(model_saved, file)
 
 # Testing
-with open('./control_affine_models/saved_models/' + 'model_cartpole_traj_sindy', 'rb') as file:
+with open('./control_affine_models/saved_models/' + 'model_cartpole_traj_big_sindy', 'rb') as file:
 	model2 = pickle.load(file)
