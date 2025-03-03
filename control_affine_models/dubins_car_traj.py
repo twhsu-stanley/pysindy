@@ -18,7 +18,7 @@ from utils import *
 #np.random.seed(100)
 
 # Set up simulation parameters
-time_horzn = 15.0
+time_horzn = 10.0
 dt = 0.01
 time_steps = int(np.ceil(time_horzn/dt))
 ang_ind = [2]
@@ -50,8 +50,8 @@ def dubins_car(t, state, u_fun):
     return dubins_car_dyn(state, u)
 
 # Generate a dataset {x_dot_i , (x_i, u_i)}, i=1,...N
-num_traj = 1100 # size of the entire dataset
-num_traj_train = 50 # size of training set
+num_traj = 1250 # size of the entire dataset
+num_traj_train = 200 # size of training set
 num_traj_cal = 1000 # size of calibration set
 num_traj_val = 50 # size of validation set
 assert num_traj_train + num_traj_cal + num_traj_val == num_traj
