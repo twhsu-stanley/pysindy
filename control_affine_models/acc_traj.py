@@ -130,7 +130,7 @@ x0 = [0.0, 20.0, 10.0]
 test_model_prediction(acc, model, x0, u_fun, time_horzn, dt, ang_ind, **integrator_keywords)
 
 # Compute conformal quantile using the calibration set and test it on the validation set
-alpha = 0.1
+alpha = 0.05
 norm = 2
 # method 1: sup over trajectories
 quantile = get_conformal_traj_quantile(model,
