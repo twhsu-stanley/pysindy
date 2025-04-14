@@ -81,9 +81,32 @@ def test_model_prediction(dynamical_system, model, x0, u_fun, time_horzn, dt, an
     axs2[x_test.shape[1]].set(xlabel="t", ylabel="u")
     fig2.show()
 
+def plot_prediction(model, x_traj, u_traj, x_dot_traj, dt):
+    "Plot actual x_dot data versus predicted x_dot data"
+    time_steps = x_traj.shape[0]
+    assert time_steps == u_traj.shape[0]
+    assert time_steps == x_dot_traj.shape[0]
+
+    x_dim = x_traj.shape[1]
+    u_dim = u_traj.shape[1]
+
+    x_dot_sindy = np.zeros((time_steps,x_dim))
+    for t in range(time_steps):
+        x_dot_sindy[t,:] = model.predict(x_traj[t,:].reshape(1,x_dim), u = u_traj[t,:].reshape(1,u_dim))
+
+    fig, axs = plt.subplots(x_traj.shape[1], 1)
+    time = np.arange(time_steps) * dt
+    for i in range(x_traj.shape[1]):
+        axs[i].plot(time, x_dot_sindy[:, i], "b", label="model prediction")
+        axs[i].plot(time, x_dot_traj[:, i], "r--", label="actual data")
+        axs[i].legend()
+        axs[i].set(xlabel="time (s)", ylabel=r"$\dot x_{}$".format(i))
+    fig.show()
+
 def check_control_affine(model):
     """Check if the model is in the control affine form"""
     # TODO: read dim of Xt and Ut from model
+    # TODO: Currently only works for dim(U) = 1?
     Xt = np.random.rand(1, model.n_features_in_-1)
     Ut = np.random.rand(1, model.n_control_features_) # TODO: or (model.n_control_features_, 1)
     #Xt = np.array([[0.0, 2.0, 0.5, 0.2, 3.0, 0.5]])
